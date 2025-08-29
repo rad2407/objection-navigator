@@ -12,7 +12,7 @@
   <link rel="apple-touch-icon" href="https://objectionsiq.com/wp-content/uploads/2025/08/cropped-objectionsiq-favicon.png">
   <meta name="theme-color" content="#0f172a">
 
-  <!-- Tailwind (CDN) -->
+  <!-- Tailwind -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = { darkMode: 'class' };
@@ -23,7 +23,7 @@
     })();
   </script>
 
-  <!-- React 18 UMD + Babel for JSX -->
+  <!-- React 18 UMD + Babel -->
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -31,8 +31,6 @@
   <style>
     html { scroll-behavior: smooth; }
     .prose pre { white-space: pre-wrap; }
-    .action-tray { transition: transform .2s ease; will-change: transform; }
-    .row-wrap { transition: transform .2s ease; }
   </style>
 </head>
 
@@ -49,7 +47,6 @@
     collection, addDoc
   } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-  // --- Firebase config ---
   const firebaseConfig = {
     apiKey: "AIzaSyADjPLowBKNwx8r1RnMsv_asaF6dwuJ4OE",
     authDomain: "objection-navigator-app.firebaseapp.com",
@@ -60,10 +57,8 @@
     measurementId: "G-J5JWXKVGH4"
   };
 
-  // --- Init ---
   const app = initializeApp(firebaseConfig);
 
-  // --- Auth ---
   const auth = getAuth(app);
   auth.languageCode = "en";
   await setPersistence(auth, browserLocalPersistence);
@@ -72,14 +67,9 @@
   provider.setCustomParameters({ prompt: "select_account" });
 
   async function signIn() {
-    try {
-      await signInWithPopup(auth, provider);
-    } catch {
-      try { await signInWithRedirect(auth, provider); }
-      catch (e) { alert("Sign in error, " + e.message); console.error(e); }
-    }
+    try { await signInWithPopup(auth, provider); }
+    catch { try { await signInWithRedirect(auth, provider); } catch (e) { alert("Sign in error, " + e.message); console.error(e); } }
   }
-
   async function signOutSafe() {
     try {
       await signOut(auth);
@@ -87,13 +77,8 @@
       localStorage.removeItem('dfs_categories_v1');
     } catch (e) { console.error(e); }
   }
+  getRedirectResult(auth).catch(e => { alert("Redirect sign in error, " + e.message); console.error(e); });
 
-  getRedirectResult(auth).catch(e => {
-    alert("Redirect sign in error, " + e.message);
-    console.error(e);
-  });
-
-  // --- Firestore ---
   const db = getFirestore(app);
 
   async function saveToCloud(uid, data, categories) {
@@ -101,7 +86,6 @@
     const ref = doc(db, "users", uid);
     await setDoc(ref, { data, categories, updatedAt: serverTimestamp() }, { merge: true });
   }
-
   async function loadFromCloud(uid) {
     if (!uid) return null;
     const ref = doc(db, "users", uid);
@@ -109,21 +93,16 @@
     return snap.exists() ? snap.data() : null;
   }
 
-  // --- Cloud Share helpers ---
   async function createSharedFromApp(data, categories) {
-    const ref = await addDoc(collection(db, "shared"), {
-      data, categories, createdAt: serverTimestamp()
-    });
+    const ref = await addDoc(collection(db, "shared"), { data, categories, createdAt: serverTimestamp() });
     return ref.id;
   }
-
   async function loadSharedDoc(id) {
     const ref = doc(db, "shared", id);
     const snap = await getDoc(ref);
     return snap.exists() ? snap.data() : null;
   }
 
-  // --- UTM helpers and lead creation ---
   function getUTM() {
     const p = new URLSearchParams(location.search);
     return {
@@ -135,7 +114,6 @@
       ref: p.get('ref') || null,
     };
   }
-
   async function createLeadIfNew(user, utm) {
     if (!user) return;
     try {
@@ -150,12 +128,9 @@
           createdAt: serverTimestamp(),
         });
       }
-    } catch (e) {
-      console.error("lead create failed", e);
-    }
+    } catch (e) { console.error("lead create failed", e); }
   }
 
-  // Expose to React (AFTER definitions)
   window.saveToCloud = saveToCloud;
   window.loadFromCloud = loadFromCloud;
   window.getUID = () => auth.currentUser?.uid || null;
@@ -163,10 +138,9 @@
   window.signOutSafe = signOutSafe;
   window.createSharedFromApp = createSharedFromApp;
   window.loadSharedDoc = loadSharedDoc;
-  window.getUTM = getUTM;                 // <-- exposed
-  window.createLeadIfNew = createLeadIfNew; // <-- exposed
+  window.getUTM = getUTM;
+  window.createLeadIfNew = createLeadIfNew;
 
-  // Auth state broadcaster + lead capture
   onAuthStateChanged(auth, async user => {
     const nameEl = document.getElementById("user-name");
     const inBtn = document.getElementById("btn-sign-in");
@@ -175,23 +149,16 @@
       nameEl && (nameEl.textContent = user.displayName || user.email || "");
       inBtn && inBtn.classList.add("hidden");
       outBtn && outBtn.classList.remove("hidden");
-
-      // capture UTM on first sign-in
       try { await createLeadIfNew(user, getUTM()); } catch (e) { console.error(e); }
     } else {
       nameEl && (nameEl.textContent = "");
       inBtn && inBtn.classList.remove("hidden");
       outBtn && outBtn.classList.add("hidden");
     }
-    window.dispatchEvent(new CustomEvent("auth-changed", {
-      detail: { uid: user?.uid || null }
-    }));
+    window.dispatchEvent(new CustomEvent("auth-changed", { detail: { uid: user?.uid || null } }));
   });
 
-  // Let the app know Firebase is ready (AFTER exposure)
   window.dispatchEvent(new Event("firebase-ready"));
-
-  // Debug helpers
   window.addEventListener("unhandledrejection", e => console.error(e.reason));
   window.addEventListener("error", e => console.error(e.error || e.message));
 </script>
@@ -202,12 +169,13 @@
   <script type="text/babel">
     const { useState, useEffect, useMemo, useRef } = React;
 
-    // ===== Storage keys =====
     const LS_DATA = 'dfs_objections_v4';
     const LS_CATS = 'dfs_categories_v1';
     const LS_KEY_LEGACY = 'dfs_objections_v3';
 
-    // ===== Category badges (known) =====
+    const L_FLOW = 'dfs_flow_v1';
+    const L_START = 'dfs_start_v1';
+
     const CATEGORY_BADGES = {
       'Price & Money': 'bg-rose-100 text-rose-800 border-rose-200 dark:bg-rose-900/30 dark:text-rose-200 dark:border-rose-800',
       'Value / Belief': 'bg-sky-100 text-sky-800 border-sky-200 dark:bg-sky-900/30 dark:text-sky-200 dark:border-sky-800',
@@ -222,15 +190,15 @@
       'Trust / Proof','Competition / Alternatives','Decision-Making',
     ];
 
-    // ===== Default data (30 entries) =====
-    const DEFAULT_DATA = [/* unchanged, keeping your 30 entries */ 
+    // 30 defaults, same as your file
+    const DEFAULT_DATA = [/* your 30 entries unchanged, kept verbatim */ 
       { id: 1, category: 'Price & Money', objection: 'I can get a website for $500.', acknowledge: 'You totally can — and honestly, if a website is all you’re looking for, then $500 is the right move.', differentiate: 'We’re not selling a website though. We’re building a system designed to help you generate and close more deals — website, CRM, ads, automation, and nurturing all working together.', anchor: 'One closing can be worth $10K. If this system brings in even one more deal all year, you’re already at a 4x ROI.', close: 'So is the goal just to have a site, or to have a system that actually brings you closings?' },
       { id: 2, category: 'Price & Money', objection: 'I want to wait until I close more deals.', acknowledge: 'Totally get it — cash flow timing is real in this business.', differentiate: 'But the system we’re offering is designed to help you get those closings, not wait on them.', anchor: 'You’re sitting on $10K+ per deal. If this gets you even one deal sooner, it pays for itself 4x over.', close: 'Do you want to keep waiting for deals to come in, or start pulling them in consistently?' },
       { id: 3, category: 'Price & Money', objection: 'This sounds expensive.', acknowledge: 'It is more than a basic site, for sure.', differentiate: 'But this isn’t a brochure site — it’s a full lead engine with automation and nurturing designed to convert strangers into closings.', anchor: 'Zillow charges $2K+ per month for shared leads. One deal here covers you for the year, and it’s exclusive.', close: 'Would you rather pay less and get zero clients, or pay more and have a system that brings in real deals?' },
       { id: 4, category: 'Value / Belief', objection: 'I’ve tried marketing before, it didn’t work.', acknowledge: 'You’re not alone — a lot of agents waste money on bad marketing.', differentiate: 'The difference here is we’re not doing one-off ads. We’ve built a system that follows up, nurtures, and converts leads automatically.', anchor: 'Most agents don’t lose because of lack of leads — they lose because they can’t convert them. That’s what we fix.', close: 'So are you done trying, or are you ready to try something that’s actually built to work?' },
-      { id: 5, category: 'Timing', objection: 'I don’t have time right now.', acknowledge: 'Makes sense — you’re probably juggling listings, showings, clients, all of it.', differentiate: 'But this is built specifically for agents with no time. We automate the lead follow-up so you don’t have to.', anchor: 'How much time do you spend chasing dead leads now? One closing from this system saves you weeks of busywork — and adds $10K to your bank account.', close: 'So do you want to keep wasting time on the wrong prospects, or free up your time by letting the system do the chasing for you?' },
+      { id: 5, category: 'Timing', objection: 'I don’t have time right now.', acknowledge: 'Makes sense — you’re probably juggling listings, showings, clients, all of it.', differentiate: 'But this is built specifically for agents with no time. We automate the lead follow up so you don’t have to.', anchor: 'How much time do you spend chasing dead leads now? One closing from this system saves you weeks of busywork — and adds $10K to your bank account.', close: 'So do you want to keep wasting time on the wrong prospects, or free up your time by letting the system do the chasing for you?' },
       { id: 6, category: 'Decision-Making', objection: 'I need to think about it.', acknowledge: 'Totally — you should never rush into a decision without being confident.', differentiate: 'But ‘thinking about it’ usually just means ‘I’m not sure it’ll work.’ What if we built the whole thing around making sure it does?', anchor: 'We’ve already helped agents go from zero pipeline to 3–5 closings a month using the same system. That’s $30K–$50K a month in potential ROI.', close: 'So is this really about thinking — or deciding if you want the current results or better ones?' },
-      { id: 7, category: 'Competition / Alternatives', objection: 'I want to run ads myself.', acknowledge: 'Respect that — taking initiative is key as an agent.', differentiate: 'But ads are just the surface. Real conversion happens after the click — in the automation, follow-up, and nurturing. That’s where most agents drop the ball.', anchor: 'You could burn $2,000 on Facebook without a single lead converting. Or invest that into a system that brings in leads and follows up automatically.', close: 'Do you want to test ads blind, or tap into a system that’s already built to convert?' },
+      { id: 7, category: 'Competition / Alternatives', objection: 'I want to run ads myself.', acknowledge: 'Respect that — taking initiative is key as an agent.', differentiate: 'But ads are just the surface. Real conversion happens after the click — in the automation, follow up, and nurturing. That’s where most agents drop the ball.', anchor: 'You could burn $2,000 on Facebook without a single lead converting. Or invest that into a system that brings in leads and follows up automatically.', close: 'Do you want to test ads blind, or tap into a system that’s already built to convert?' },
       { id: 8, category: 'Competition / Alternatives', objection: 'I’m working with another marketing company.', acknowledge: 'Smart — good agents don’t try to do it all alone.', differentiate: 'But what’s the metric they’re getting you — clicks or clients? We build systems that drive closings, not vanity metrics.', anchor: 'Most agencies charge retainers then outsource. We build an integrated system and tie cost to results.', close: 'Do you want to keep hoping your agency delivers, or invest in a model built to drive ROI you can track?' },
       { id: 9, category: 'Timing', objection: 'Can I just do this later?', acknowledge: 'You absolutely can — timing is everything in this game.', differentiate: 'But every month without a predictable system is another month of hoping for referrals instead of owning your pipeline.', anchor: 'If you close one extra deal this quarter because of this, that’s $10K. How many of those are you willing to delay?', close: 'Do you want to stay reactive — or finally be in control of your lead flow?' },
       { id: 10, category: 'Trust / Proof', objection: 'How do I know this will actually work?', acknowledge: 'That’s a legit question — especially with how much fluff is out there.', differentiate: 'We don’t just build a website. We build a lead acquisition machine — offers, targeting, copy, automation — every piece tested for conversion.', anchor: 'Zillow and Realtor.com sell leads to 5 agents. We give you exclusivity. That’s the difference between shared scraps and pipeline dominance.', close: 'What feels more reliable — renting attention from lead sellers, or owning a system that brings leads directly to you?' },
@@ -256,7 +224,6 @@
       { id: 30, category: 'Timing', objection: 'I want to see what happens with the market first.', acknowledge: 'Makes sense — this market is unpredictable.', differentiate: 'Waiting does not protect you, it exposes you. Our system helps you win either way.', anchor: 'You do not need a great market. You need a great pipeline.', close: 'Are you waiting on the market to save you, or taking control of your results?' },
     ];
 
-    // ===== Helpers =====
     const clsx = (...a) => a.filter(Boolean).join(' ');
     const normalizeEntry = e => ({
       id: 0, category: 'Price & Money', objection: '',
@@ -264,103 +231,325 @@
       opening: '', discovery: '', transition: '', closingScript: '',
       script: '', notes: '', ...e
     });
+    const renumber = arr => arr.map((d, i) => ({ ...d, id: i + 1 }));
+    const buildScriptFromADA = e => [
+      `Acknowledge, ${e.acknowledge || ''}`,
+      `Differentiate, ${e.differentiate || ''}`,
+      `Anchor, ${e.anchor || ''}`,
+      `Close, ${e.close || ''}`,
+    ].join('\n\n');
 
-    function renumber(arr) { return arr.map((d, idx) => ({ ...d, id: idx + 1 })); }
+    const IconSun = props => (<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" {...props}><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"></path></svg>);
+    const IconMoon = props => (<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" {...props}><path d="M21 12.79A9 9 0 1 1 11.21 3a7 7 0 1 0 9.79 9.79z"></path></svg>);
 
-    function encodeSharePayload(obj) {
-      try { return btoa(unescape(encodeURIComponent(JSON.stringify(obj)))); } catch { return null; }
-    }
-    function decodeSharePayload(str) {
-      try { return JSON.parse(decodeURIComponent(escape(atob(str)))); } catch { return null; }
-    }
-
-    function buildScriptFromADA(entry) {
-      return [
-        `Acknowledge, ${entry.acknowledge || ''}`,
-        `Differentiate, ${entry.differentiate || ''}`,
-        `Anchor, ${entry.anchor || ''}`,
-        `Close, ${entry.close || ''}`,
-      ].join('\n\n');
-    }
-
-    // Small icons
-    const IconSun = (props) => (
-      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" {...props}>
-        <circle cx="12" cy="12" r="4"></circle>
-        <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"></path>
-      </svg>
-    );
-    const IconMoon = (props) => (
-      <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" {...props}>
-        <path d="M21 12.79A9 9 0 1 1 11.21 3a7 7 0 1 0 9.79 9.79z"></path>
-      </svg>
-    );
-
-    // ===== UI bits =====
     function TextArea({ label, value, onChange, rows = 6, placeholder='' }) {
       return (
         <div className="space-y-1">
           {label ? <label className="text-sm text-gray-600 dark:text-gray-300">{label}</label> : null}
-          <textarea
-            rows={rows}
-            value={value ?? ''}
-            onChange={e => onChange(e.target.value)}
-            placeholder={placeholder}
-            className="w-full rounded-xl border px-3 py-2 bg-white dark:bg-gray-900 dark:text-gray-100 dark:border-gray-700"
-          />
+          <textarea rows={rows} value={value ?? ''} onChange={e => onChange(e.target.value)} placeholder={placeholder}
+            className="w-full rounded-xl border px-3 py-2 bg-white dark:bg-gray-900 dark:text-gray-100 dark:border-gray-700" />
         </div>
       );
     }
-
     function CopyButton({ text, className = '' }) {
       const [copied, setCopied] = useState(false);
       return (
-        <button
-          onClick={() => { navigator.clipboard.writeText(text || ''); setCopied(true); setTimeout(() => setCopied(false), 1200); }}
-          className={clsx('px-3 py-1.5 rounded-xl border dark:border-gray-700', className)}
-        >
+        <button onClick={() => { navigator.clipboard.writeText(text || ''); setCopied(true); setTimeout(() => setCopied(false), 1200); }}
+          className={clsx('px-3 py-1.5 rounded-xl border dark:border-gray-700', className)}>
           {copied ? 'Copied!' : 'Copy'}
         </button>
       );
     }
 
-    // ===== Gate (paywall) =====
     function Gate() {
       return (
         <div className="min-h-screen flex items-center justify-center p-6">
           <div className="w-full max-w-xl rounded-2xl border dark:border-gray-700 bg-white dark:bg-gray-800 p-6">
             <div className="flex items-center gap-2 mb-3">
-              <img
-                src="https://objectionsiq.com/wp-content/uploads/2025/08/cropped-objectionsiq-favicon.png"
-                alt="ObjectionIQ"
-                className="h-8 w-8 rounded"
-              />
-              <div className="text-lg font-bold">
-                Objection<span className="text-[#059669]">IQ</span> Navigator
-              </div>
+              <img src="https://objectionsiq.com/wp-content/uploads/2025/08/cropped-objectionsiq-favicon.png" alt="ObjectionIQ" className="h-8 w-8 rounded" />
+              <div className="text-lg font-bold">Objection<span className="text-emerald-600">IQ</span> Navigator</div>
             </div>
-
             <h2 className="text-xl font-semibold">Get free access</h2>
-            <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">
-              Join with Google, we will save your workspace in the cloud.
-            </p>
-
-            <button
-              onClick={() => window.signIn?.()}
-              className="mt-4 w-full px-4 py-2 rounded-xl border dark:border-gray-700 bg-black text-white"
-            >
-              Continue with Google
-            </button>
-
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-3">
-              Already joined, click the button and choose your account.
-            </p>
+            <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">Join with Google, we will save your workspace in the cloud.</p>
+            <button onClick={() => window.signIn?.()} className="mt-4 w-full px-4 py-2 rounded-xl border dark:border-gray-700 bg-black text-white">Continue with Google</button>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-3">Already joined, click the button and choose your account.</p>
           </div>
         </div>
       );
     }
 
-    // ===== Category Manager =====
+    /* ---------------- NAVIGATOR, with CRUD ---------------- */
+    const DEFAULT_FLOW = {
+      start:{id:'start',speaker:'You',text:'Most agents I talk to either have a system in place, or they are still figuring out follow up. How are you handling follow up right now',options:[
+        {label:'I have a CRM',next:'crm_1'},
+        {label:'Leads do not convert',next:'conv_1'},
+        {label:'I am too busy',next:'busy_1'}]},
+      crm_1:{id:'crm_1',speaker:'You',text:'Does it follow up on its own, or do you do most of it yourself',options:[
+        {label:'Mostly me',next:'crm_me'},
+        {label:'It is automated',next:'crm_auto'}]},
+      crm_me:{id:'crm_me',speaker:'You',text:'When you get busy, do some leads slip through',options:[
+        {label:'Yes',next:'bridge_1'},
+        {label:'No',next:'crm_probe'}]},
+      crm_auto:{id:'crm_auto',speaker:'You',text:'What happens to people who do not reply in the first few days, do you keep outreach going for weeks, or do they go cold',options:[
+        {label:'They go cold',next:'bridge_1'},
+        {label:'We keep outreach going',next:'bridge_2'}]},
+      crm_probe:{id:'crm_probe',speaker:'You',text:'How many touches do they get in the first month',options:[
+        {label:'Three to five',next:'bridge_1'},
+        {label:'Ten or more',next:'bridge_2'}]},
+      conv_1:{id:'conv_1',speaker:'You',text:'Do they never respond, or do they stall after a bit',options:[
+        {label:'Never respond',next:'bridge_1'},
+        {label:'Stall after a bit',next:'bridge_1'}]},
+      busy_1:{id:'busy_1',speaker:'You',text:'When things pile up, what gets pushed first, new leads, or past clients',options:[
+        {label:'New leads',next:'bridge_1'},
+        {label:'Past clients',next:'bridge_1'}]},
+      bridge_1:{id:'bridge_1',speaker:'You',text:'Sounds like there is a gap. If I show a simple way to keep follow up running on its own, keep people warm for months, and ping you when they are ready, would you want a look',options:[
+        {label:'Yes',next:'close_book'},
+        {label:'Maybe later',next:'close_soft'},
+        {label:'No',next:'close_no'}]},
+      bridge_2:{id:'bridge_2',speaker:'You',text:'You are ahead of most. If we add speed to lead and long term nurture so you work only hot replies, would a five minute walk through help you decide',options:[
+        {label:'Yes',next:'close_book'},
+        {label:'Send info',next:'close_email'},
+        {label:'Not now',next:'close_soft'}]},
+      close_book:{id:'close_book',speaker:'You',text:'Great. What works better, a short Zoom this afternoon, or tomorrow morning',options:[]},
+      close_email:{id:'close_email',speaker:'You',text:'Easy. I will send a short video and a sample follow up map. What is the best email',options:[]},
+      close_soft:{id:'close_soft',speaker:'You',text:'All good. I will send a two minute overview so you can decide if a demo is worth it',options:[]},
+      close_no:{id:'close_no',speaker:'You',text:'No problem. If you want a simple way to keep follow up moving without extra effort, reach out',options:[]}
+    };
+
+    function Navigator() {
+      const [flow, setFlow] = useState(() => {
+        try { return JSON.parse(localStorage.getItem(L_FLOW) || 'null') || DEFAULT_FLOW; } catch { return DEFAULT_FLOW; }
+      });
+      const [startId, setStartId] = useState(() => localStorage.getItem(L_START) || 'start');
+      const [history, setHistory] = useState([startId]);
+      const [transcript, setTranscript] = useState([]);
+      const [admin, setAdmin] = useState(false);
+      const [editId, setEditId] = useState(startId);
+      const [nodeDraft, setNodeDraft] = useState(flow[startId]);
+      const [optionDrafts, setOptionDrafts] = useState(flow[startId]?.options || []);
+
+      useEffect(() => { localStorage.setItem(L_FLOW, JSON.stringify(flow)); }, [flow]);
+      useEffect(() => { localStorage.setItem(L_START, startId); }, [startId]);
+
+      const current = flow[history[history.length - 1]];
+      useEffect(() => {
+        if (!current) return;
+        setTranscript(t => [...t, { speaker: current.speaker, text: current.text }]);
+      }, [history[history.length - 1]]); // new node, append speaker line
+
+      function go(nextId, label) {
+        if (!nextId) return;
+        setTranscript(t => [...t, { speaker: 'Realtor', text: label }]);
+        setHistory(h => [...h, nextId]);
+      }
+      function back() {
+        if (history.length <= 1) return;
+        setHistory(h => h.slice(0, -1));
+        setTranscript(t => t.slice(0, -1)); // drop last Realtor line
+      }
+      function resetFlow() {
+        setHistory([startId]);
+        setTranscript([]);
+      }
+
+      function openEditor(id) {
+        const n = flow[id];
+        setEditId(id);
+        setNodeDraft({ id: n?.id || id, speaker: n?.speaker || 'You', text: n?.text || '' });
+        setOptionDrafts(n?.options || []);
+        setAdmin(true);
+      }
+      useEffect(() => { openEditor(history[history.length - 1]); }, []); // init
+
+      function saveNode() {
+        if (!nodeDraft?.id) { alert('Node id is required'); return; }
+        const obj = {
+          id: nodeDraft.id,
+          speaker: nodeDraft.speaker || 'You',
+          text: nodeDraft.text || '',
+          options: optionDrafts.filter(o => (o.label || '').trim().length),
+        };
+        setFlow(prev => ({ ...prev, [obj.id]: obj }));
+        setEditId(obj.id);
+        alert('Node saved');
+      }
+      function addNode() {
+        const id = prompt('New node id');
+        if (!id) return;
+        if (flow[id]) { alert('Id exists'); return; }
+        const obj = { id, speaker: 'You', text: '', options: [] };
+        setFlow(prev => ({ ...prev, [id]: obj }));
+        setEditId(id);
+        setNodeDraft(obj);
+        setOptionDrafts([]);
+      }
+      function deleteNode() {
+        const id = editId;
+        if (!id || !flow[id]) return;
+        if (!confirm('Delete node, ' + id + '')) return;
+        const copy = { ...flow };
+        delete copy[id];
+        setFlow(copy);
+        const fallback = startId in copy ? startId : Object.keys(copy)[0] || 'start';
+        setEditId(fallback);
+        setNodeDraft(copy[fallback] || { id: 'start', speaker: 'You', text: '', options: [] });
+        setOptionDrafts(copy[fallback]?.options || []);
+        if (history[history.length - 1] === id) resetFlow();
+      }
+      function setAsStart() {
+        if (!nodeDraft?.id) return;
+        setStartId(nodeDraft.id);
+        setHistory([nodeDraft.id]);
+        setTranscript([]);
+      }
+      function addOptionRow() {
+        setOptionDrafts(o => [...o, { label: '', next: '' }]);
+      }
+      function updateOptionRow(i, key, val) {
+        setOptionDrafts(o => o.map((x, idx) => idx === i ? { ...x, [key]: val } : x));
+      }
+      function removeOptionRow(i) {
+        setOptionDrafts(o => o.filter((_, idx) => idx !== i));
+      }
+      function exportFlow() {
+        const blob = new Blob([JSON.stringify({ flow, start: startId }, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a'); a.href = url; a.download = 'navigator-flow.json'; a.click(); URL.revokeObjectURL(url);
+      }
+      function importFlow(e) {
+        const f = e.target.files?.[0]; if (!f) return;
+        const r = new FileReader();
+        r.onload = () => {
+          try {
+            const obj = JSON.parse(r.result);
+            const nf = obj?.flow && typeof obj.flow === 'object' ? obj.flow : null;
+            const ns = obj?.start || 'start';
+            if (!nf) throw new Error('Invalid file');
+            setFlow(nf);
+            setStartId(ns);
+            setHistory([ns]);
+            setTranscript([]);
+            openEditor(ns);
+            alert('Flow imported');
+          } catch (err) { alert('Import failed, ' + err.message); }
+        };
+        r.readAsText(f);
+        e.target.value = '';
+      }
+
+      return (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <div className="lg:col-span-1 space-y-3">
+            <div className="rounded-2xl border dark:border-gray-700 p-4 bg-white dark:bg-gray-800">
+              <div className="flex items-center justify-between gap-2">
+                <div className="text-sm font-semibold">Navigator</div>
+                <div className="flex gap-2">
+                  <button onClick={back} className="px-3 py-1.5 rounded-xl border dark:border-gray-700">Back</button>
+                  <button onClick={resetFlow} className="px-3 py-1.5 rounded-xl border dark:border-gray-700">Reset</button>
+                  <button onClick={() => setAdmin(a => !a)} className="px-3 py-1.5 rounded-xl border dark:border-gray-700">{admin ? 'Hide Admin' : 'Admin'}</button>
+                </div>
+              </div>
+              <div className="mt-3 rounded-xl border dark:border-gray-700 p-3 bg-gray-50 dark:bg-gray-900">
+                <div className="text-sm text-gray-500 dark:text-gray-300 mb-1">Question</div>
+                <div className="whitespace-pre-line">{current?.text || 'Missing node'}</div>
+              </div>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {(current?.options || []).map((o, i) => (
+                  <button key={i} onClick={() => go(o.next, o.label)} className="px-3 py-1.5 rounded-xl border dark:border-gray-700 bg-white dark:bg-gray-900">
+                    {o.label}
+                  </button>
+                ))}
+              </div>
+
+              <div className="mt-3">
+                <div className="text-sm text-gray-500 dark:text-gray-300 mb-1">Transcript</div>
+                <pre className="rounded-xl border dark:border-gray-700 p-3 bg-gray-50 dark:bg-gray-900 whitespace-pre-wrap text-sm">
+{transcript.map(t => `${t.speaker} | ${t.text}`).join('\n')}
+                </pre>
+              </div>
+            </div>
+
+            {admin && (
+              <div className="rounded-2xl border dark:border-gray-700 p-4 bg-white dark:bg-gray-800">
+                <div className="flex items-center justify-between">
+                  <div className="text-sm font-semibold">Editor, current node</div>
+                  <div className="flex gap-2">
+                    <button onClick={addNode} className="px-3 py-1.5 rounded-xl border dark:border-gray-700">Add</button>
+                    <button onClick={setAsStart} className="px-3 py-1.5 rounded-xl border dark:border-gray-700">Set Start</button>
+                    <button onClick={deleteNode} className="px-3 py-1.5 rounded-xl border dark:border-gray-700 text-rose-600">Delete</button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
+                  <div>
+                    <label className="text-sm text-gray-600 dark:text-gray-300">Node ID</label>
+                    <input value={nodeDraft?.id || ''} onChange={e => setNodeDraft(v => ({ ...v, id: e.target.value }))} className="w-full rounded-xl border px-3 py-2 bg-white dark:bg-gray-900 dark:text-gray-100 dark:border-gray-700" />
+                  </div>
+                  <div>
+                    <label className="text-sm text-gray-600 dark:text-gray-300">Speaker</label>
+                    <input value={nodeDraft?.speaker || 'You'} onChange={e => setNodeDraft(v => ({ ...v, speaker: e.target.value }))} className="w-full rounded-xl border px-3 py-2 bg-white dark:bg-gray-900 dark:text-gray-100 dark:border-gray-700" />
+                  </div>
+                </div>
+
+                <div className="mt-3">
+                  <TextArea label="Text" value={nodeDraft?.text} onChange={val => setNodeDraft(v => ({ ...v, text: val }))} rows={4} />
+                </div>
+
+                <div className="mt-3">
+                  <div className="flex items-center justify-between">
+                    <div className="text-sm text-gray-600 dark:text-gray-300">Options</div>
+                    <button onClick={addOptionRow} className="px-3 py-1.5 rounded-xl border dark:border-gray-700">Add option</button>
+                  </div>
+                  <div className="space-y-2 mt-2">
+                    {optionDrafts.map((op, i) => (
+                      <div key={i} className="grid grid-cols-1 md:grid-cols-5 gap-2">
+                        <input value={op.label} onChange={e => updateOptionRow(i, 'label', e.target.value)} placeholder="label" className="md:col-span-2 rounded-xl border px-3 py-2 bg-white dark:bg-gray-900 dark:text-gray-100 dark:border-gray-700" />
+                        <input value={op.next} onChange={e => updateOptionRow(i, 'next', e.target.value)} placeholder="next id" className="md:col-span-2 rounded-xl border px-3 py-2 bg-white dark:bg-gray-900 dark:text-gray-100 dark:border-gray-700" />
+                        <button onClick={() => removeOptionRow(i)} className="px-3 py-1.5 rounded-xl border dark:border-gray-700 text-rose-600">Remove</button>
+                      </div>
+                    ))}
+                    {!optionDrafts.length && <div className="text-xs text-gray-500">No options yet</div>}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 mt-3">
+                  <button onClick={saveNode} className="px-3 py-1.5 rounded-xl border bg-black text-white">Save node</button>
+                  <button onClick={() => openEditor(nodeDraft?.id || startId)} className="px-3 py-1.5 rounded-xl border dark:border-gray-700">Reload</button>
+                  <button onClick={exportFlow} className="px-3 py-1.5 rounded-xl border dark:border-gray-700">Export</button>
+                  <label className="px-3 py-1.5 rounded-xl border dark:border-gray-700 cursor-pointer">
+                    Import
+                    <input type="file" accept="application/json" className="hidden" onChange={importFlow} />
+                  </label>
+                </div>
+              </div>
+            )}
+
+            <div className="rounded-2xl border dark:border-gray-700 p-4 bg-white dark:bg-gray-800">
+              <div className="text-sm text-gray-600 dark:text-gray-300">Jump to node</div>
+              <div className="mt-2 grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-64 overflow-auto">
+                {Object.values(flow).map(n => (
+                  <button key={n.id} onClick={() => { setHistory([n.id]); setTranscript([]); openEditor(n.id); }}
+                    className="px-2 py-1.5 rounded-xl border dark:border-gray-700 text-sm bg-white dark:bg-gray-900">
+                    {n.id}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="lg:col-span-2">
+            <div className="rounded-2xl border dark:border-gray-700 p-4 bg-white dark:bg-gray-800">
+              <div className="text-sm text-gray-600 dark:text-gray-300">Current node JSON</div>
+              <pre className="mt-2 rounded-xl border dark:border-gray-700 p-3 bg-gray-50 dark:bg-gray-900 whitespace-pre-wrap text-xs">
+{JSON.stringify(current || {}, null, 2)}
+              </pre>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    /* ---------------- LIBRARY, your existing app ---------------- */
     function CategoryManager({ open, onClose, categories, setCategories, data, setData }) {
       const [local, setLocal] = useState(categories);
       const [newCat, setNewCat] = useState('');
@@ -381,7 +570,7 @@
         setData(prev => prev.map(d => d.category === oldName ? { ...d, category: nextName } : d));
       }
       function deleteCat(name) {
-        if (!confirm(`Delete "${name}"?`)) return;
+        if (!confirm(`Delete "${name}"`)) return;
         const fallback = 'Uncategorized';
         const nextList = local.filter(c => c !== name);
         if (!nextList.includes(fallback)) nextList.push(fallback);
@@ -398,25 +587,20 @@
               <h2 className="text-xl font-bold">Manage Categories</h2>
               <button onClick={onClose} className="px-3 py-1.5 rounded-xl border dark:border-gray-700">Close</button>
             </div>
-
             <div className="space-y-3 max-h-[60vh] overflow-auto">
               {local.map((c, i) => (
                 <div key={c + '_' + i} className="flex items-center gap-2">
-                  <input
-                    defaultValue={c}
-                    onBlur={e => renameCat(c, e.target.value)}
-                    className="flex-1 rounded-xl border px-3 py-2 bg-white dark:bg-gray-900 dark:text-gray-100 dark:border-gray-700"
-                  />
+                  <input defaultValue={c} onBlur={e => renameCat(c, e.target.value)}
+                    className="flex-1 rounded-xl border px-3 py-2 bg-white dark:bg-gray-900 dark:text-gray-100 dark:border-gray-700" />
                   <button onClick={() => deleteCat(c)} className="px-3 py-1.5 rounded-xl border dark:border-gray-700 text-rose-600">Delete</button>
                 </div>
               ))}
             </div>
-
             <div className="flex items-center gap-2 mt-4">
-              <input value={newCat} onChange={e => setNewCat(e.target.value)} placeholder="New category" className="flex-1 rounded-xl border px-3 py-2 bg-white dark:bg-gray-900 dark:text-gray-100 dark:border-gray-700" />
+              <input value={newCat} onChange={e => setNewCat(e.target.value)} placeholder="New category"
+                className="flex-1 rounded-xl border px-3 py-2 bg-white dark:bg-gray-900 dark:text-gray-100 dark:border-gray-700" />
               <button onClick={addCat} className="px-3 py-1.5 rounded-xl border bg-black text-white">Add</button>
             </div>
-
             <div className="flex justify-end mt-4">
               <button onClick={save} className="px-3 py-1.5 rounded-xl border bg-black text-white">Save</button>
             </div>
@@ -425,7 +609,6 @@
       );
     }
 
-    // ===== Editor Card =====
     function EditorCard({ mode, draft, setDraft, onCancel, onSave, categories }) {
       function regenScript() { setDraft(v => ({ ...v, script: buildScriptFromADA(v) })); }
       return (
@@ -437,39 +620,38 @@
               <button onClick={onSave} className="px-3 py-1.5 rounded-xl border bg-black text-white">Save</button>
             </div>
           </div>
-
           <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-1">
               <label className="text-sm text-gray-600 dark:text-gray-300">ID</label>
-              <input value={draft?.id ?? ''} onChange={e => setDraft(v => ({ ...v, id: Number(e.target.value)||0 }))} className="w-full rounded-xl border px-3 py-2 bg-white dark:bg-gray-900 dark:text-gray-100 dark:border-gray-700" />
+              <input value={draft?.id ?? ''} onChange={e => setDraft(v => ({ ...v, id: Number(e.target.value)||0 }))}
+                className="w-full rounded-xl border px-3 py-2 bg-white dark:bg-gray-900 dark:text-gray-100 dark:border-gray-700" />
             </div>
             <div className="space-y-1">
               <label className="text-sm text-gray-600 dark:text-gray-300">Category</label>
-              <select value={draft?.category ?? (categories[0] || 'Uncategorized')} onChange={e => setDraft(v => ({ ...v, category: e.target.value }))} className="w-full rounded-xl border px-3 py-2 bg-white dark:bg-gray-900 dark:text-gray-100 dark:border-gray-700">
+              <select value={draft?.category ?? (categories[0] || 'Uncategorized')}
+                onChange={e => setDraft(v => ({ ...v, category: e.target.value }))}
+                className="w-full rounded-xl border px-3 py-2 bg-white dark:bg-gray-900 dark:text-gray-100 dark:border-gray-700">
                 {categories.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
           </div>
-
           <div className="mt-4 space-y-1">
             <label className="text-sm text-gray-600 dark:text-gray-300">Objection</label>
-            <input value={draft?.objection ?? ''} onChange={e => setDraft(v => ({ ...v, objection: e.target.value }))} className="w-full rounded-xl border px-3 py-2 bg-white dark:bg-gray-900 dark:text-gray-100 dark:border-gray-700" />
+            <input value={draft?.objection ?? ''} onChange={e => setDraft(v => ({ ...v, objection: e.target.value }))}
+              className="w-full rounded-xl border px-3 py-2 bg-white dark:bg-gray-900 dark:text-gray-100 dark:border-gray-700" />
           </div>
-
           <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
             <TextArea label="Acknowledge" value={draft?.acknowledge} onChange={val => setDraft(v => ({ ...v, acknowledge: val }))} />
             <TextArea label="Differentiate" value={draft?.differentiate} onChange={val => setDraft(v => ({ ...v, differentiate: val }))} />
             <TextArea label="Anchor" value={draft?.anchor} onChange={val => setDraft(v => ({ ...v, anchor: val }))} />
             <TextArea label="Close" value={draft?.close} onChange={val => setDraft(v => ({ ...v, close: val }))} />
           </div>
-
           <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
             <TextArea label="Opening Script" value={draft?.opening} onChange={val => setDraft(v => ({ ...v, opening: val }))} rows={8} />
             <TextArea label="Discovery Questions" value={draft?.discovery} onChange={val => setDraft(v => ({ ...v, discovery: val }))} rows={8} />
             <TextArea label="Transition Bridge" value={draft?.transition} onChange={val => setDraft(v => ({ ...v, transition: val }))} rows={6} />
             <TextArea label="Closing Script" value={draft?.closingScript} onChange={val => setDraft(v => ({ ...v, closingScript: val }))} rows={6} />
           </div>
-
           <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <div className="flex items-center justify-between">
@@ -493,8 +675,7 @@
       );
     }
 
-    // ===== App =====
-    function App() {
+    function LibraryView({ uid }) {
       const [isDark, setIsDark] = useState(() => document.documentElement.classList.contains('dark'));
       function toggleTheme() {
         const next = !isDark;
@@ -503,39 +684,13 @@
         localStorage.setItem('theme', next ? 'dark' : 'light');
       }
 
-      // Auth
-      const [uid, setUid] = useState(window.getUID?.() || null);
-      const [authReady, setAuthReady] = useState(false);
-      const didInitialCloudSync = React.useRef(false);
-
-      // Auth events
-      useEffect(() => {
-        function onAuthChanged(e) {
-          setUid(e.detail.uid || null);
-          setAuthReady(true);
-        }
-        window.addEventListener('auth-changed', onAuthChanged);
-        return () => window.removeEventListener('auth-changed', onAuthChanged);
-      }, []);
-
-      // Core data
       const [data, setData] = useState(() => {
-        try {
-          const hash = window.location.hash.replace(/^#/, '');
-          if (hash.startsWith('data=')) {
-            const payload = decodeSharePayload(hash.slice(5));
-            if (Array.isArray(payload) && payload.length) return payload.map(normalizeEntry);
-          }
-        } catch {}
         try {
           const v4 = localStorage.getItem(LS_DATA);
           if (v4) return JSON.parse(v4).map(normalizeEntry);
-          const legacy = localStorage.getItem(LS_KEY_LEGACY);
-          if (legacy) return JSON.parse(legacy).map(normalizeEntry);
         } catch {}
         return DEFAULT_DATA.map(normalizeEntry);
       });
-
       const [categories, setCategories] = useState(() => {
         try {
           const saved = JSON.parse(localStorage.getItem(LS_CATS) || 'null');
@@ -545,120 +700,21 @@
         return Array.from(new Set([...DEFAULT_CATS, ...fromData, 'Uncategorized']));
       });
 
-      // Persist local
-      useEffect(() => { localStorage.setItem(LS_DATA, JSON.stringify(data)); }, [data]);
-      useEffect(() => { localStorage.setItem(LS_CATS, JSON.stringify(categories)); }, [categories]);
-
-      // Shared view banner state
-      const [isSharedView, setIsSharedView] = useState(false);
-
-      // Load shared link if present; wait for Firebase to be ready
-      useEffect(() => {
-        async function applyShareFromHash(h) {
-          const m = h.match(/^#share=([A-Za-z0-9_-]+)$/);
-          if (!m) return;
-          const id = m[1];
-
-          try {
-            const v = await window.loadSharedDoc(id);
-            if (!v) { alert('Shared link not found'); return; }
-            setCategories(Array.from(new Set([...(v.categories || []), 'Uncategorized'])));
-            setData((v.data || []).map(normalizeEntry));
-            setIsSharedView(true);
-            setActiveIdx(0);
-          } catch (e) {
-            console.error('loadSharedDoc error', e);
-            alert('Failed to load shared link');
-          }
-        }
-
-        function run() {
-          if (typeof window.loadSharedDoc === 'function') {
-            applyShareFromHash(location.hash);
-          }
-        }
-
-        if (typeof window.loadSharedDoc === 'function') {
-          run();
-        } else {
-          const onReady = () => run();
-          window.addEventListener('firebase-ready', onReady, { once: true });
-        }
-
-        const onHash = () => applyShareFromHash(location.hash);
-        window.addEventListener('hashchange', onHash);
-        return () => window.removeEventListener('hashchange', onHash);
-      }, []);
-
-      // Load from cloud after sign-in
-      useEffect(() => {
-        if (!uid) return;
-        (async () => {
-          try {
-            const cloud = await window.loadFromCloud(uid);
-
-            if (cloud?.data && Array.isArray(cloud.data)) {
-              setData(cloud.data.map(normalizeEntry));
-            }
-            if (cloud?.categories && Array.isArray(cloud.categories)) {
-              setCategories(prev => Array.from(new Set([...(cloud.categories || []), 'Uncategorized'])));
-            }
-
-            if (!cloud) {
-              const freshData = DEFAULT_DATA.map(normalizeEntry);
-              const freshCats = Array.from(new Set([...DEFAULT_CATS, 'Uncategorized']));
-              setData(freshData);
-              setCategories(freshCats);
-              await window.saveToCloud(uid, freshData, freshCats);
-            }
-          } catch (err) {
-            console.error('Cloud load failed', err);
-          } finally {
-            didInitialCloudSync.current = true;
-          }
-        })();
-      }, [uid]);
-
-      // Save to cloud with progress
       const [saving, setSaving] = useState(false);
       const [progress, setProgress] = useState(0);
       const [showUpdated, setShowUpdated] = useState(false);
 
-      useEffect(() => {
-        if (!uid) return;
-        if (!didInitialCloudSync.current) return;
+      const [authReady, setAuthReady] = useState(true);
+      const [isSharedView, setIsSharedView] = useState(false);
 
-        let intervalId = null;
-        const t = setTimeout(() => {
-          setSaving(true);
-          setProgress(10);
-          intervalId = setInterval(() => {
-            setProgress(p => Math.min(p + Math.random() * 20, 90));
-          }, 300);
+      useEffect(() => { localStorage.setItem(LS_DATA, JSON.stringify(data)); }, [data]);
+      useEffect(() => { localStorage.setItem(LS_CATS, JSON.stringify(categories)); }, [categories]);
 
-          window.saveToCloud(uid, data, categories)
-            .then(() => {
-              setProgress(100);
-              setShowUpdated(true);
-              setTimeout(() => setShowUpdated(false), 1600);
-            })
-            .catch(err => console.error('Cloud save failed', err))
-            .finally(() => {
-              if (intervalId) clearInterval(intervalId);
-              setTimeout(() => { setSaving(false); setProgress(0); }, 300);
-            });
-        }, 400);
-
-        return () => { clearTimeout(t); if (intervalId) clearInterval(intervalId); };
-      }, [uid, data, categories]);
-
-      // ------- UI State -------
       const [q, setQ] = useState('');
       const [categoryFilter, setCategoryFilter] = useState('All');
       const [activeIdx, setActiveIdx] = useState(0);
       const [mode, setMode] = useState('view');
       const [draft, setDraft] = useState(null);
-      const [savedAt, setSavedAt] = useState(null);
       const [tab, setTab] = useState('ada');
       const [quickEdit, setQuickEdit] = useState(false);
       const [quickDraft, setQuickDraft] = useState(null);
@@ -669,10 +725,23 @@
       const fileRef = useRef(null);
       const detailRef = useRef(null);
       const userSelectedRef = useRef(false);
-      const touchStartX = useRef(0);
-      const touchingId = useRef(null);
 
-      useEffect(() => { setSavedAt(new Date()); }, [data]);
+      useEffect(() => {
+        if (!uid) return;
+        let intervalId = null;
+        const t = setTimeout(() => {
+          setSaving(true);
+          setProgress(10);
+          intervalId = setInterval(() => { setProgress(p => Math.min(p + Math.random() * 20, 90)); }, 300);
+          window.saveToCloud(uid, data, categories)
+            .then(() => { setProgress(100); setShowUpdated(true); setTimeout(() => setShowUpdated(false), 1600); })
+            .catch(err => console.error('Cloud save failed', err))
+            .finally(() => { if (intervalId) clearInterval(intervalId); setTimeout(() => { setSaving(false); setProgress(0); }, 300); });
+        }, 400);
+        return () => { clearTimeout(t); if (intervalId) clearInterval(intervalId); };
+      }, [uid, data, categories]);
+
+      useEffect(() => { setQuickDraft(normalizeEntry(filtered[activeIdx] || {})); }, [activeIdx]);
 
       const filtered = useMemo(() => {
         const words = q.toLowerCase().split(/\s+/).filter(Boolean);
@@ -684,8 +753,6 @@
       }, [q, categoryFilter, data]);
 
       const active = filtered[activeIdx] || filtered[0];
-
-      useEffect(() => { if (active) setQuickDraft(normalizeEntry(active)); }, [activeIdx, filtered.length, active?.id, tab]);
 
       useEffect(() => {
         function onKey(e) {
@@ -702,15 +769,6 @@
 
       useEffect(() => { setActiveIdx(0); }, [q, categoryFilter]);
 
-      // Scroll detail on selection
-      useEffect(() => {
-        if (!detailRef.current) return;
-        if (!userSelectedRef.current) return;
-        userSelectedRef.current = false;
-        detailRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }, [activeIdx]);
-
-      // CRUD
       function beginAdd() {
         setMode('add');
         const nextId = (data.length ? Math.max(...data.map(d => d.id)) : 0) + 1;
@@ -722,16 +780,12 @@
         if (!draft.objection?.trim()) return alert('Objection is required');
         if (!draft.category) return alert('Category is required');
         if (!categories.includes(draft.category)) setCategories(prev => Array.from(new Set([...prev, draft.category])));
-        if (mode === 'add') {
-          setData(prev => [...prev, { ...draft }]);
-          setActiveIdx(filtered.length);
-        } else if (mode === 'edit') {
-          setData(prev => prev.map(d => d.id === draft.id ? { ...draft } : d));
-        }
+        if (mode === 'add') setData(prev => [...prev, { ...draft }]);
+        if (mode === 'edit') setData(prev => prev.map(d => d.id === draft.id ? { ...draft } : d));
         setMode('view'); setDraft(null);
       }
       function deleteItem(id) {
-        if (!confirm('Delete this objection?')) return;
+        if (!confirm('Delete this objection')) return;
         setData(prev => renumber(prev.filter(d => d.id !== id)));
         setOpenActionId(null);
         setActiveIdx(0);
@@ -742,22 +796,12 @@
         setData(prev => [...prev, clone]);
         setOpenActionId(null);
       }
-      function resetDefaults() {
-        if (!confirm('Reset to default 30 objections? This will overwrite your saved set.')) return;
-        setData(DEFAULT_DATA.map(normalizeEntry));
-        setCategories(Array.from(new Set([...DEFAULT_CATS, 'Uncategorized'])));
-        setQ(''); setCategoryFilter('All'); setActiveIdx(0); setMode('view'); setDraft(null);
-      }
       function exportJSON() {
         const blob = new Blob([JSON.stringify({ data, categories }, null, 2)], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url; a.download = 'objection_navigator.json'; a.click();
-        URL.revokeObjectURL(url);
+        const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'objection_navigator.json'; a.click(); URL.revokeObjectURL(url);
       }
       function importJSON(e) {
-        const file = e.target.files?.[0];
-        if (!file) return;
+        const file = e.target.files?.[0]; if (!file) return;
         const reader = new FileReader();
         reader.onload = () => {
           try {
@@ -773,377 +817,244 @@
         reader.readAsText(file);
         e.target.value = '';
       }
-      function copyShareLink() {
-        const packed = encodeSharePayload(data);
-        if (!packed) return alert('Could not create share link.');
-        const url = `${location.origin}${location.pathname}#data=${packed}`;
-        navigator.clipboard?.writeText
-          ? navigator.clipboard.writeText(url).then(() => alert('Share link copied to clipboard.'))
-          : prompt('Copy this share link', url);
-      }
 
-      async function createCloudShare() {
-        const uid = window.getUID?.();
-        if (!uid) { alert('Sign in first'); return; }
-        let url = '';
-        try {
-          const id = await window.createSharedFromApp(data, categories);
-          url = `${location.origin}${location.pathname}#share=${id}`;
-
-          if (navigator.share) {
-            try { await navigator.share({ title: 'Objection Navigator', url }); return; } catch (_) {}
-          }
-          if (navigator.clipboard?.writeText) {
-            try { await navigator.clipboard.writeText(url); alert('Cloud share link copied'); return; }
-            catch (e) {}
-          }
-          prompt('Copy this share link', url);
-        } catch (e) {
-          console.error(e);
-          if (url) prompt('Copy this share link', url);
-          else alert('Could not create share link');
-        }
-      }
-
-      // Quick edit
       function qeField(k, v) { setQuickDraft(prev => ({ ...prev, [k]: v })); }
       function qeSave() { if (!quickDraft) return; setData(prev => prev.map(d => d.id === quickDraft.id ? { ...normalizeEntry(quickDraft) } : d)); setQuickEdit(false); }
       function qeCancel() { setQuickDraft(normalizeEntry(active)); setQuickEdit(false); }
 
-      // List interactions
-      function selectRow(idx) {
-        userSelectedRef.current = true;
-        setActiveIdx(idx);
-        setMode('view'); setDraft(null);
-        setOpenActionId(null);
-      }
+      const badgeClass = cat => CATEGORY_BADGES[cat] || 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-800 dark:text-gray-200 dark:border-gray-700';
 
-      // Swipe actions
-      function onTouchStart(id, x) { touchStartX.current = x; touchingId.current = id; }
-      function onTouchMove(id, x) {
-        if (touchingId.current !== id) return;
-        const dx = x - touchStartX.current;
-        if (dx < -40) setOpenActionId(id);
-        if (dx > 40) setOpenActionId(null);
-      }
-      function onTouchEnd() { touchingId.current = null; }
-
-      function badgeClass(cat) {
-        if (CATEGORY_BADGES[cat]) return CATEGORY_BADGES[cat];
-        return 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-800 dark:text-gray-200 dark:border-gray-700';
-      }
-
-      // ---------- RENDER ----------
       return (
-        !authReady ? (
-          <div className="min-h-screen flex items-center justify-center p-10 text-sm text-gray-500">
-            Checking your session...
-          </div>
-        ) : !uid ? (
-          <Gate />
-        ) : (
-          <div className="min-h-screen w-full p-4 md:p-8">
-            {/* Top progress bar */}
-            <div className="fixed top-0 left-0 right-0 h-1 z-50">
-              <div
-                className={clsx("h-1 bg-emerald-500 transition-all", saving ? "opacity-100" : "opacity-0")}
-                style={{ width: saving ? `${progress}%` : '0%' }}
-              />
+        <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="md:col-span-1 space-y-3">
+            <header className="flex items-center justify-between">
+              <h1 className="text-xl md:text-2xl font-bold leading-tight">
+                <span className="inline-flex items-center gap-2">
+                  <img src="https://objectionsiq.com/wp-content/uploads/2025/08/cropped-objectionsiq-favicon.png" alt="ObjectionIQ logo" className="h-7 w-7 md:h-8 md:w-8 shrink-0 rounded" />
+                  <span>Objection<span className="text-emerald-600">IQ</span> Navigator</span>
+                </span>
+                <span className="block text-xs md:text-sm text-gray-500 mt-1">By Digital Footprint</span>
+              </h1>
+              <div className="flex items-center gap-3">
+                <button onClick={() => {
+                  const next = !document.documentElement.classList.contains('dark');
+                  document.documentElement.classList.toggle('dark', next);
+                  localStorage.setItem('theme', next ? 'dark' : 'light');
+                }} className="px-2 py-1.5 rounded-xl border dark:border-gray-700" title="Toggle theme">
+                  {document.documentElement.classList.contains('dark') ? <IconSun /> : <IconMoon />}
+                </button>
+                <button id="btn-sign-in" onClick={() => window.signIn?.()} className="px-3 py-1.5 rounded-xl border dark:border-gray-700 hidden">Sign in</button>
+                <button id="btn-sign-out" onClick={() => window.signOutSafe?.()} className="px-3 py-1.5 rounded-xl border dark:border-gray-700">Sign out</button>
+                <span id="user-name" className="text-sm text-gray-600 dark:text-gray-300"></span>
+              </div>
+            </header>
+
+            <div className="flex flex-wrap gap-2">
+              <button onClick={() => setMode('add')} className="px-3 py-1.5 rounded-xl border bg-black text-white">Add New</button>
+              <button onClick={() => setCatMgrOpen(true)} className="px-3 py-1.5 rounded-xl border dark:border-gray-700">Categories</button>
+              <button onClick={exportJSON} className="px-3 py-1.5 rounded-xl border dark:border-gray-700">Export</button>
+              <button onClick={() => document.getElementById('import-file').click()} className="px-3 py-1.5 rounded-xl border dark:border-gray-700">Import</button>
+              <input id="import-file" type="file" accept="application/json" className="hidden" onChange={importJSON} />
             </div>
 
-            {showUpdated && (
-              <div className="fixed top-3 right-3 z-50 px-3 py-1.5 rounded-lg text-sm bg-emerald-600 text-white shadow">
-                Updated 👍
-              </div>
-            )}
+            <div className="flex items-center gap-2">
+              <input ref={searchRef} value={q} onChange={e => setQ(e.target.value)}
+                placeholder="Search objections, ADA+C, scripts, notes"
+                className="w-full rounded-2xl border border-gray-300 dark:border-gray-700 px-4 py-2 bg-white dark:bg-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-400 dark:focus:ring-gray-600" />
+            </div>
 
-            <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="md:col-span-1 space-y-3">
-                <header className="flex items-center justify-between">
-                  <h1 className="text-xl md:text-2xl font-bold leading-tight">
-                    <span className="inline-flex items-center gap-2">
-                      <img
-                        src="https://objectionsiq.com/wp-content/uploads/2025/08/cropped-objectionsiq-favicon.png"
-                        alt="ObjectionIQ logo"
-                        className="h-7 w-7 md:h-8 md:w-8 shrink-0 rounded"
-                        loading="lazy"
-                        decoding="async"
-                      />
-                      <span>Objection<span className="text-[#059669]">IQ</span> Navigator</span>
-                    </span>
-                    <span className="block text-xs md:text-sm text-gray-500 mt-1">
-                      By Digital Footprint
-                    </span>
-                  </h1>
+            <div className="flex flex-wrap gap-2">
+              {['All', ...categories].map(cat => (
+                <button key={cat} onClick={() => setCategoryFilter(cat)}
+                  className={clsx('px-3 py-1 rounded-full border text-sm dark:border-gray-700', cat !== 'All' && badgeClass(cat), categoryFilter === cat && 'ring-2 ring-black/10 dark:ring-white/10')}>
+                  {cat}
+                </button>
+              ))}
+            </div>
 
-                  <div className="flex items-center gap-3">
-                    <button
-                      onClick={toggleTheme}
-                      className="px-2 py-1.5 rounded-xl border dark:border-gray-700"
-                      aria-label="Toggle dark mode"
-                      title="Toggle theme"
-                    >
-                      {isDark ? <IconSun /> : <IconMoon />}
-                    </button>
-
-                    <button id="btn-sign-in" onClick={() => window.signIn?.()} className="px-3 py-1.5 rounded-xl border dark:border-gray-700 hidden">
-                      Sign in with Google
-                    </button>
-                    <button id="btn-sign-out" onClick={() => window.signOutSafe?.()} className="px-3 py-1.5 rounded-xl border dark:border-gray-700">
-                      Sign out
-                    </button>
-                    <span id="user-name" className="text-sm text-gray-600 dark:text-gray-300"></span>
-                  </div>
-                </header>
-
-                {isSharedView && (
-                  <div className="rounded-xl border dark:border-gray-700 bg-amber-50 dark:bg-amber-900/30 text-amber-900 dark:text-amber-100 px-3 py-2 text-sm">
-                    You are viewing a shared set, edits will not save to your account.
-                  </div>
-                )}
-
-                <div className="flex flex-wrap gap-2">
-                  <button onClick={beginAdd} className="px-3 py-1.5 rounded-xl border bg-black text-white">Add New</button>
-                  <button onClick={() => setCatMgrOpen(true)} className="px-3 py-1.5 rounded-xl border dark:border-gray-700">Categories</button>
-                  <button onClick={exportJSON} className="px-3 py-1.5 rounded-xl border dark:border-gray-700">Export</button>
-                  <button onClick={() => fileRef.current?.click()} className="px-3 py-1.5 rounded-xl border dark:border-gray-700">Import</button>
-                  <input ref={fileRef} type="file" accept="application/json" className="hidden" onChange={importJSON} />
-                  <button onClick={resetDefaults} className="px-3 py-1.5 rounded-xl border dark:border-gray-700">Reset</button>
-                  <button onClick={copyShareLink} className="px-3 py-1.5 rounded-xl border dark:border-gray-700">Share Link</button>
-                  <button onClick={createCloudShare} className="px-3 py-1.5 rounded-xl border">Cloud Share</button>
-                  <div className="text-xs text-gray-500 dark:text-gray-400 self-center">{savedAt ? `Saved ${savedAt.toLocaleTimeString()}` : ''}</div>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <input
-                    ref={searchRef}
-                    value={q}
-                    onChange={e => setQ(e.target.value)}
-                    placeholder="Search objections, ADA+C, scripts, notes (Ctrl/Cmd+K)"
-                    className="w-full rounded-2xl border border-gray-300 dark:border-gray-700 px-4 py-2 bg-white dark:bg-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-400 dark:focus:ring-gray-600"
-                  />
-                </div>
-
-                <div className="flex flex-wrap gap-2">
-                  {['All', ...categories].map(cat => (
-                    <button
-                      key={cat}
-                      onClick={() => setCategoryFilter(cat)}
-                      className={clsx('px-3 py-1 rounded-full border text-sm dark:border-gray-700',
-                        cat !== 'All' && badgeClass(cat),
-                        categoryFilter === cat && 'ring-2 ring-black/10 dark:ring-white/10')}
-                    >
-                      {cat}
-                    </button>
-                  ))}
-                </div>
-
-                <div className="bg-gray-50 dark:bg-gray-900 rounded-2xl border dark:border-gray-700 overflow-hidden">
-                  <div className="max-h-[60vh] overflow-auto divide-y dark:divide-gray-800">
-                    {filtered.map((item, idx) => {
-                      const isActive = idx === activeIdx;
-                      const open = openActionId === item.id;
-                      return (
-                        <div
-                          key={item.id}
-                          className={clsx('p-3 space-y-2 border-b dark:border-gray-800',
-                            isActive ? 'bg-[#d1fae5] dark:bg-emerald-900/40' : 'hover:bg-gray-50 dark:hover:bg-gray-800')}
-                          onTouchStart={(e) => onTouchStart(item.id, e.touches[0].clientX)}
-                          onTouchMove={(e) => onTouchMove(item.id, e.touches[0].clientX)}
-                          onTouchEnd={onTouchEnd}
-                        >
-                          <div className="flex items-start justify-between gap-2">
-                            <button
-                              onClick={() => selectRow(idx)}
-                              className="text-left flex-1"
-                              aria-label={`Select objection ${item.id}`}
-                            >
-                              <div className="font-medium">{item.id}. {item.objection}</div>
-                            </button>
-                            <div className={clsx('px-2 py-0.5 rounded-full border text-xs', badgeClass(item.category))}>
-                              {item.category}
-                            </div>
-                            <button
-                              onClick={(e) => { e.stopPropagation(); setOpenActionId(open ? null : item.id); }}
-                              className="px-2 py-1 text-xs rounded border bg-white dark:bg-gray-900 dark:text-gray-100 dark:border-gray-700"
-                              title="Actions"
-                            >
-                              ✎
-                            </button>
-                          </div>
-
-                          {open && (
-                            <div className="flex gap-2 mt-2">
-                              <button onClick={() => beginEdit(item)} className="px-2 py-1 text-xs rounded border dark:border-gray-700">Edit</button>
-                              <button onClick={() => duplicateItem(item)} className="px-2 py-1 text-xs rounded border dark:border-gray-700">Duplicate</button>
-                              <button onClick={() => deleteItem(item.id)} className="px-2 py-1 text-xs rounded border dark:border-gray-700 text-rose-700">Delete</button>
-                            </div>
-                          )}
+            <div className="bg-gray-50 dark:bg-gray-900 rounded-2xl border dark:border-gray-700 overflow-hidden">
+              <div className="max-h-[60vh] overflow-auto divide-y dark:divide-gray-800">
+                {filtered.map((item, idx) => {
+                  const isActive = idx === activeIdx;
+                  return (
+                    <div key={item.id}
+                      className={clsx('p-3 space-y-2 border-b dark:border-gray-800', isActive ? 'bg-emerald-100 dark:bg-emerald-900/40' : 'hover:bg-gray-50 dark:hover:bg-gray-800')}
+                      onClick={() => { setActiveIdx(idx); setMode('view'); }}>
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="text-left flex-1">
+                          <div className="font-medium">{item.id}. {item.objection}</div>
                         </div>
-                      );
-                    })}
+                        <div className={clsx('px-2 py-0.5 rounded-full border text-xs', badgeClass(item.category))}>{item.category}</div>
+                        <div className="flex gap-2">
+                          <button onClick={(e) => { e.stopPropagation(); setMode('edit'); setDraft(item); }}
+                            className="px-2 py-1 text-xs rounded border dark:border-gray-700">Edit</button>
+                          <button onClick={(e) => { e.stopPropagation(); const nextId = (data.length ? Math.max(...data.map(d => d.id)) : 0) + 1; const clone = normalizeEntry({ ...item, id: nextId, objection: item.objection + ' (copy)' }); setData(prev => [...prev, clone]); }}
+                            className="px-2 py-1 text-xs rounded border dark:border-gray-700">Duplicate</button>
+                          <button onClick={(e) => { e.stopPropagation(); deleteItem(item.id); }}
+                            className="px-2 py-1 text-xs rounded border dark:border-gray-700 text-rose-700">Delete</button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          <div className="md:col-span-2">
+            {mode === 'view' && active ? (
+              <div id={`resp-${active.id}`} className="bg-white dark:bg-gray-800 dark:border-gray-700 rounded-3xl border p-5 md:p-8 shadow-sm">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className={clsx('inline-flex items-center gap-2 px-2.5 py-1 rounded-full border text-xs', CATEGORY_BADGES[active.category] || '')}>{active.category}</div>
+                    <h2 className="text-2xl font-bold mt-3">{active.id}. {active.objection}</h2>
+                  </div>
+                  <div className="flex gap-2 items-center">
+                    <button onClick={() => setQuickEdit(q => !q)} className={clsx('px-3 py-1.5 rounded-xl border dark:border-gray-700', quickEdit && 'bg-black text-white')}>{quickEdit ? 'Done' : 'Quick Edit'}</button>
+                    <button onClick={() => setMode('edit')} className="px-3 py-1.5 rounded-xl border dark:border-gray-700">Full Edit</button>
                   </div>
                 </div>
-              </div>
 
-              <div className="md:col-span-2">
-                {mode === 'view' && active ? (
-                  <div
-                    ref={detailRef}
-                    id={`resp-${active.id}`}
-                    className="bg-white dark:bg-gray-800 dark:border-gray-700 rounded-3xl border p-5 md:p-8 shadow-sm"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <div className={clsx('inline-flex items-center gap-2 px-2.5 py-1 rounded-full border text-xs', badgeClass(active.category))}>{active.category}</div>
-                        <h2 className="text-2xl font-bold mt-3">{active.id}. {active.objection}</h2>
+                <div className="mt-4 flex gap-2">
+                  <button className={clsx('px-3 py-1.5 rounded-xl border dark:border-gray-700', tab==='ada' && 'bg-black text-white')} onClick={() => setTab('ada')}>ADA+C</button>
+                  <button className={clsx('px-3 py-1.5 rounded-xl border dark:border-gray-700', tab==='scripts' && 'bg-black text-white')} onClick={() => setTab('scripts')}>Scripts and Notes</button>
+                </div>
+
+                {tab === 'ada' ? (
+                  <div className="mt-6 space-y-6 prose">
+                    <section>
+                      <h3 className="font-semibold mb-2">Acknowledge</h3>
+                      {quickEdit ? <TextArea value={quickDraft?.acknowledge} onChange={val => setQuickDraft(v => ({ ...v, acknowledge: val }))} /> : <p className="leading-relaxed whitespace-pre-line">{active.acknowledge}</p>}
+                    </section>
+                    <section>
+                      <h3 className="font-semibold mb-2">Differentiate</h3>
+                      {quickEdit ? <TextArea value={quickDraft?.differentiate} onChange={val => setQuickDraft(v => ({ ...v, differentiate: val }))} /> : <p className="leading-relaxed whitespace-pre-line">{active.differentiate}</p>}
+                    </section>
+                    <section>
+                      <h3 className="font-semibold mb-2">Anchor</h3>
+                      {quickEdit ? <TextArea value={quickDraft?.anchor} onChange={val => setQuickDraft(v => ({ ...v, anchor: val }))} /> : <p className="leading-relaxed whitespace-pre-line">{active.anchor}</p>}
+                    </section>
+                    <section>
+                      <h3 className="font-semibold mb-2">Close</h3>
+                      {quickEdit ? <TextArea value={quickDraft?.close} onChange={val => setQuickDraft(v => ({ ...v, close: val }))} /> : <p className="italic leading-relaxed">{active.close}</p>}
+                    </section>
+                    <section className="pt-2">
+                      <div className="flex items-center justify-between">
+                        <h3 className="font-semibold mb-2">Composed Script</h3>
+                        <CopyButton text={quickEdit ? (quickDraft?.script || buildScriptFromADA(quickDraft || {})) : (active.script || buildScriptFromADA(active))} />
                       </div>
-                      <div className="flex gap-2 items-center">
-                        <button onClick={() => setQuickEdit(q => !q)} className={clsx('px-3 py-1.5 rounded-xl border dark:border-gray-700', quickEdit && 'bg-black text-white')}>{quickEdit ? 'Done' : 'Quick Edit'}</button>
-                        <button onClick={() => beginEdit(active)} className="px-3 py-1.5 rounded-xl border dark:border-gray-700">Full Edit</button>
-                      </div>
-                    </div>
-
-                    <div className="mt-4 flex gap-2">
-                      <button className={clsx('px-3 py-1.5 rounded-xl border dark:border-gray-700', tab==='ada' && 'bg-black text-white')} onClick={() => setTab('ada')}>ADA+C</button>
-                      <button className={clsx('px-3 py-1.5 rounded-xl border dark:border-gray-700', tab==='scripts' && 'bg-black text-white')} onClick={() => setTab('scripts')}>Scripts and Notes</button>
-                    </div>
-
-                    {tab === 'ada' ? (
-                      <div className="mt-6 space-y-6 prose">
-                        <section>
-                          <h3 className="font-semibold mb-2">Acknowledge</h3>
-                          {quickEdit ? (
-                            <TextArea value={quickDraft?.acknowledge} onChange={val => qeField('acknowledge', val)} />
-                          ) : (
-                            <p className="leading-relaxed whitespace-pre-line">{active.acknowledge}</p>
-                          )}
-                        </section>
-                        <section>
-                          <h3 className="font-semibold mb-2">Differentiate</h3>
-                          {quickEdit ? (
-                            <TextArea value={quickDraft?.differentiate} onChange={val => qeField('differentiate', val)} />
-                          ) : (
-                            <p className="leading-relaxed whitespace-pre-line">{active.differentiate}</p>
-                          )}
-                        </section>
-                        <section>
-                          <h3 className="font-semibold mb-2">Anchor</h3>
-                          {quickEdit ? (
-                            <TextArea value={quickDraft?.anchor} onChange={val => qeField('anchor', val)} />
-                          ) : (
-                            <p className="leading-relaxed whitespace-pre-line">{active.anchor}</p>
-                          )}
-                        </section>
-                        <section>
-                          <h3 className="font-semibold mb-2">Close</h3>
-                          {quickEdit ? (
-                            <TextArea value={quickDraft?.close} onChange={val => qeField('close', val)} />
-                          ) : (
-                            <p className="italic leading-relaxed">{active.close}</p>
-                          )}
-                        </section>
-                        <section className="pt-2">
-                          <div className="flex items-center justify-between">
-                            <h3 className="font-semibold mb-2">Composed Script</h3>
-                            <CopyButton text={(quickEdit ? buildScriptFromADA(quickDraft||{}) : (active.script || buildScriptFromADA(active)))} />
-                          </div>
-                          {quickEdit ? (
-                            <TextArea value={quickDraft?.script} onChange={val => qeField('script', val)} rows={10} placeholder="Auto generated or paste your talk track here" />
-                          ) : (
-                            <pre className="bg-gray-50 dark:bg-gray-900 rounded-xl p-4">{active.script || buildScriptFromADA(active)}</pre>
-                          )}
-                        </section>
-
-                        {quickEdit && (
-                          <div className="flex gap-2 pt-2">
-                            <button onClick={qeSave} className="px-3 py-1.5 rounded-xl border bg-black text-white">Save Changes</button>
-                            <button onClick={qeCancel} className="px-3 py-1.5 rounded-xl border dark:border-gray-700">Cancel</button>
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="mt-6 space-y-6 prose">
-                        <section>
-                          <h3 className="font-semibold mb-2">Opening Script</h3>
-                          {quickEdit ? (
-                            <TextArea value={quickDraft?.opening} onChange={val => qeField('opening', val)} rows={8} />
-                          ) : (
-                            <pre className="bg-gray-50 dark:bg-gray-900 rounded-xl p-4">{active.opening || '—'}</pre>
-                          )}
-                        </section>
-                        <section>
-                          <h3 className="font-semibold mb-2">Discovery Questions</h3>
-                          {quickEdit ? (
-                            <TextArea value={quickDraft?.discovery} onChange={val => qeField('discovery', val)} rows={8} />
-                          ) : (
-                            <pre className="bg-gray-50 dark:bg-gray-900 rounded-xl p-4">{active.discovery || '—'}</pre>
-                          )}
-                        </section>
-                        <section>
-                          <h3 className="font-semibold mb-2">Transition Bridge</h3>
-                          {quickEdit ? (
-                            <TextArea value={quickDraft?.transition} onChange={val => qeField('transition', val)} rows={6} />
-                          ) : (
-                            <pre className="bg-gray-50 dark:bg-gray-900 rounded-xl p-4">{active.transition || '—'}</pre>
-                          )}
-                        </section>
-                        <section>
-                          <h3 className="font-semibold mb-2">Closing Script</h3>
-                          {quickEdit ? (
-                            <TextArea value={quickDraft?.closingScript} onChange={val => qeField('closingScript', val)} rows={6} />
-                          ) : (
-                            <pre className="bg-gray-50 dark:bg-gray-900 rounded-xl p-4">{active.closingScript || '—'}</pre>
-                          )}
-                        </section>
-                        <section>
-                          <div className="flex items-center justify-between">
-                            <h3 className="font-semibold mb-2">Internal Notes</h3>
-                            <CopyButton text={quickEdit ? (quickDraft?.notes||'') : (active.notes || '')} />
-                          </div>
-                          {quickEdit ? (
-                            <TextArea value={quickDraft?.notes} onChange={val => qeField('notes', val)} rows={8} />
-                          ) : (
-                            <pre className="bg-gray-50 dark:bg-gray-900 rounded-xl p-4">{active.notes || '—'}</pre>
-                          )}
-                        </section>
-
-                        {quickEdit && (
-                          <div className="flex gap-2 pt-2">
-                            <button onClick={qeSave} className="px-3 py-1.5 rounded-xl border bg-black text-white">Save Changes</button>
-                            <button onClick={qeCancel} className="px-3 py-1.5 rounded-xl border dark:border-gray-700">Cancel</button>
-                          </div>
-                        )}
+                      {quickEdit ? <TextArea value={quickDraft?.script} onChange={val => setQuickDraft(v => ({ ...v, script: val }))} rows={10} /> : <pre className="bg-gray-50 dark:bg-gray-900 rounded-xl p-4">{active.script || buildScriptFromADA(active)}</pre>}
+                    </section>
+                    {quickEdit && (
+                      <div className="flex gap-2 pt-2">
+                        <button onClick={() => { setData(prev => prev.map(d => d.id === quickDraft.id ? { ...normalizeEntry(quickDraft) } : d)); setQuickEdit(false); }} className="px-3 py-1.5 rounded-xl border bg-black text-white">Save Changes</button>
+                        <button onClick={() => { setQuickDraft(normalizeEntry(active)); setQuickEdit(false); }} className="px-3 py-1.5 rounded-xl border dark:border-gray-700">Cancel</button>
                       </div>
                     )}
                   </div>
                 ) : (
-                  <EditorCard
-                    mode={mode}
-                    draft={draft}
-                    setDraft={setDraft}
-                    onCancel={cancelEdit}
-                    onSave={saveDraft}
-                    categories={categories}
-                  />
+                  <div className="mt-6 space-y-6 prose">
+                    <section>
+                      <h3 className="font-semibold mb-2">Opening Script</h3>
+                      {quickEdit ? <TextArea value={quickDraft?.opening} onChange={val => setQuickDraft(v => ({ ...v, opening: val }))} rows={8} /> : <pre className="bg-gray-50 dark:bg-gray-900 rounded-xl p-4">{active.opening || '—'}</pre>}
+                    </section>
+                    <section>
+                      <h3 className="font-semibold mb-2">Discovery Questions</h3>
+                      {quickEdit ? <TextArea value={quickDraft?.discovery} onChange={val => setQuickDraft(v => ({ ...v, discovery: val }))} rows={8} /> : <pre className="bg-gray-50 dark:bg-gray-900 rounded-xl p-4">{active.discovery || '—'}</pre>}
+                    </section>
+                    <section>
+                      <h3 className="font-semibold mb-2">Transition Bridge</h3>
+                      {quickEdit ? <TextArea value={quickDraft?.transition} onChange={val => setQuickDraft(v => ({ ...v, transition: val }))} rows={6} /> : <pre className="bg-gray-50 dark:bg-gray-900 rounded-xl p-4">{active.transition || '—'}</pre>}
+                    </section>
+                    <section>
+                      <h3 className="font-semibold mb-2">Closing Script</h3>
+                      {quickEdit ? <TextArea value={quickDraft?.closingScript} onChange={val => setQuickDraft(v => ({ ...v, closingScript: val }))} rows={6} /> : <pre className="bg-gray-50 dark:bg-gray-900 rounded-xl p-4">{active.closingScript || '—'}</pre>}
+                    </section>
+                    <section>
+                      <div className="flex items-center justify-between">
+                        <h3 className="font-semibold mb-2">Internal Notes</h3>
+                        <CopyButton text={quickEdit ? (quickDraft?.notes||'') : (active.notes || '')} />
+                      </div>
+                      {quickEdit ? <TextArea value={quickDraft?.notes} onChange={val => setQuickDraft(v => ({ ...v, notes: val }))} rows={8} /> : <pre className="bg-gray-50 dark:bg-gray-900 rounded-xl p-4">{active.notes || '—'}</pre>}
+                    </section>
+                    {quickEdit && (
+                      <div className="flex gap-2 pt-2">
+                        <button onClick={() => { setData(prev => prev.map(d => d.id === quickDraft.id ? { ...normalizeEntry(quickDraft) } : d)); setQuickEdit(false); }} className="px-3 py-1.5 rounded-xl border bg-black text-white">Save Changes</button>
+                        <button onClick={() => { setQuickDraft(normalizeEntry(active)); setQuickEdit(false); }} className="px-3 py-1.5 rounded-xl border dark:border-gray-700">Cancel</button>
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
-            </div>
-
-            <footer className="max-w-7xl mx-auto mt-6 text-xs text-gray-500 dark:text-gray-400">
-              Real Estate Objection Handling, 30 Templates, Custom Categories, Slide-out Actions, Quick Edit, Import or Export, Autosave, Share Link, Cloud Share
-            </footer>
-
-            <CategoryManager
-              open={catMgrOpen}
-              onClose={() => setCatMgrOpen(false)}
-              categories={categories}
-              setCategories={setCategories}
-              data={data}
-              setData={setData}
-            />
+            ) : (
+              <EditorCard mode={mode} draft={draft} setDraft={setDraft} onCancel={() => { setMode('view'); setDraft(null); }} onSave={() => {
+                if (!draft.objection?.trim()) return alert('Objection is required');
+                if (!draft.category) return alert('Category is required');
+                if (!categories.includes(draft.category)) setCategories(prev => Array.from(new Set([...prev, draft.category])));
+                if (mode === 'add') setData(prev => [...prev, { ...draft }]);
+                if (mode === 'edit') setData(prev => prev.map(d => d.id === draft.id ? { ...draft } : d));
+                setMode('view'); setDraft(null);
+              }} categories={categories} />
+            )}
           </div>
-        )
+
+          {/* Progress and updated */}
+          <div className="fixed top-0 left-0 right-0 h-1 z-50">
+            <div className={clsx("h-1 bg-emerald-500 transition-all", saving ? "opacity-100" : "opacity-0")}
+              style={{ width: saving ? `${progress}%` : '0%' }} />
+          </div>
+          {showUpdated && (
+            <div className="fixed top-3 right-3 z-50 px-3 py-1.5 rounded-lg text-sm bg-emerald-600 text-white shadow">
+              Updated 👍
+            </div>
+          )}
+
+          <CategoryManager open={catMgrOpen} onClose={() => setCatMgrOpen(false)}
+            categories={categories} setCategories={setCategories} data={data} setData={setData} />
+        </div>
+      );
+    }
+
+    /* ---------------- Shell with tabs ---------------- */
+    function App() {
+      const [uid, setUid] = useState(window.getUID?.() || null);
+      const [authReady, setAuthReady] = useState(false);
+      const [tab, setTab] = useState('library'); // 'library' or 'navigator'
+
+      useEffect(() => {
+        function onAuthChanged(e) { setUid(e.detail.uid || null); setAuthReady(true); }
+        window.addEventListener('auth-changed', onAuthChanged);
+        return () => window.removeEventListener('auth-changed', onAuthChanged);
+      }, []);
+
+      if (!authReady) return <div className="min-h-screen flex items-center justify-center p-10 text-sm text-gray-500">Checking your session...</div>;
+      if (!uid) return <Gate />;
+
+      return (
+        <div className="min-h-screen w-full p-4 md:p-8">
+          <div className="max-w-7xl mx-auto mb-4 flex items-center justify-between">
+            <div className="text-xl font-bold">Objection<span className="text-emerald-600">IQ</span> Workspace</div>
+            <div className="flex gap-2">
+              <button id="btn-sign-out" onClick={() => window.signOutSafe?.()} className="px-3 py-1.5 rounded-xl border dark:border-gray-700">Sign out</button>
+              <span id="user-name" className="text-sm text-gray-600 dark:text-gray-300"></span>
+            </div>
+          </div>
+
+          <div className="max-w-7xl mx-auto mb-4">
+            <div className="inline-flex rounded-full border dark:border-gray-700 overflow-hidden">
+              <button onClick={() => setTab('library')}
+                className={clsx('px-4 py-2 text-sm', tab==='library' ? 'bg-black text-white' : 'bg-white dark:bg-gray-900')}>
+                Library
+              </button>
+              <button onClick={() => setTab('navigator')}
+                className={clsx('px-4 py-2 text-sm', tab==='navigator' ? 'bg-black text-white' : 'bg-white dark:bg-gray-900')}>
+                Navigator
+              </button>
+            </div>
+          </div>
+
+          {tab === 'library' ? <LibraryView uid={uid} /> : <Navigator />}
+        </div>
       );
     }
 
