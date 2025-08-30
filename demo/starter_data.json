@@ -1,0 +1,92 @@
+[
+  {
+    "id": 1,
+    "category": "Timing",
+    "objection": "“The market is cooling — I want to wait.”",
+    "acknowledge": "I hear that. Timing matters.",
+    "differentiate": "This isn’t about selling in a frenzy. It’s about selling with strategy while others wait.",
+    "anchor": "Waiting could mean missing today’s motivated buyers and losing equity as prices shift.",
+    "close": "Do you want to ride the current wave, or wait and hope it rebounds?"
+  },
+  {
+    "id": 2,
+    "category": "Competition / Alternatives",
+    "objection": "“I can sell it myself and save the commission.”",
+    "acknowledge": "Totally get it. Saving money sounds smart.",
+    "differentiate": "But this isn't about listing a home — it's about getting top-dollar with negotiation power.",
+    "anchor": "FSBO homes often sell for less and take longer. That savings could cost you more.",
+    "close": "Do you want to save on commission, or make the most on your sale?"
+  },
+  {
+    "id": 3,
+    "category": "Competition / Alternatives",
+    "objection": "“I already know an agent.”",
+    "acknowledge": "Of course. Familiar faces feel safe.",
+    "differentiate": "But listing with a friend and partnering with a pro aren’t the same.",
+    "anchor": "Selling your biggest asset should be based on skill, not comfort.",
+    "close": "Is loyalty worth more than the price your home sells for?"
+  },
+  {
+    "id": 4,
+    "category": "Trust / Proof",
+    "objection": "“Another agent said they could get me more.”",
+    "acknowledge": "That’s tempting. More sounds better.",
+    "differentiate": "But promises don’t close deals. Pricing right attracts real buyers, not wishful ones.",
+    "anchor": "Overpriced homes sit, get reduced, and sell for less in the end.",
+    "close": "Do you want to feel good upfront, or walk away with more in the bank?"
+  },
+  {
+    "id": 5,
+    "category": "Timing",
+    "objection": "“We’re not in a rush.”",
+    "acknowledge": "I get that. No pressure.",
+    "differentiate": "But waiting doesn’t mean waiting risk-free.",
+    "anchor": "The longer you wait, the more uncertainty enters the market — and the less control you have.",
+    "close": "Wouldn’t it be better to sell on your terms while you still can?"
+  },
+  {
+    "id": 6,
+    "category": "Price & Money",
+    "objection": "“Your commission is too high.”",
+    "acknowledge": "That’s fair to ask.",
+    "differentiate": "But this isn’t about cost — it’s about net. A better agent nets you more.",
+    "anchor": "You don’t want to save $10K only to lose $30K on the sale.",
+    "close": "Would you rather save on the fee or walk away with more at closing?"
+  },
+  {
+    "id": 7,
+    "category": "Pricing / Strategy",
+    "objection": "“We want to test the market first.”",
+    "acknowledge": "Testing feels low risk.",
+    "differentiate": "But testing attracts low offers — serious buyers skip overpriced homes.",
+    "anchor": "First impressions sell homes. You only get one shot.",
+    "close": "Do you want to test, or position it right and win from day one?"
+  },
+  {
+    "id": 8,
+    "category": "Value / Belief",
+    "objection": "“We need to finish renovations first.”",
+    "acknowledge": "That makes sense. You want to impress buyers.",
+    "differentiate": "But not all renos return value. Some delay the sale without adding profit.",
+    "anchor": "The market may shift while you're still updating.",
+    "close": "Want me to show you which updates actually help you sell for more?"
+  },
+  {
+    "id": 9,
+    "category": "Timing",
+    "objection": "“We’re waiting for interest rates to drop.”",
+    "acknowledge": "That’s a common strategy.",
+    "differentiate": "But rates dropping doesn’t always mean more buyers — it may also mean more sellers.",
+    "anchor": "More sellers means more competition — and less leverage for you.",
+    "close": "Would you rather sell now with less competition or wait and fight for attention?"
+  },
+  {
+    "id": 10,
+    "category": "Competition / Alternatives",
+    "objection": "“We’re going to rent it out instead.”",
+    "acknowledge": "Renting feels like a backup plan.",
+    "differentiate": "But that plan comes with maintenance, vacancies, and tenant risk.",
+    "anchor": "One bad tenant or a slow market and your returns drop fast.",
+    "close": "Do you want passive stress or a clean payout you can bank on?"
+  }
+]

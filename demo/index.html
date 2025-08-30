@@ -1,0 +1,537 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Objection Navigator — Demo</title>
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="https://objectionsiq.com/wp-content/uploads/2025/08/cropped-objectionsiq-favicon.png">
+  <link rel="apple-touch-icon" href="https://objectionsiq.com/wp-content/uploads/2025/08/cropped-objectionsiq-favicon.png">
+  <meta name="theme-color" content="#0f172a">
+
+  <!-- Tailwind (CDN) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = { darkMode: 'class' };
+    (function () {
+      const t = localStorage.getItem('theme');
+      const prefers = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      if (t === 'dark' || (!t && prefers)) document.documentElement.classList.add('dark');
+    })();
+  </script>
+
+  <!-- React 18 UMD + Babel for JSX -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <style>
+    html { scroll-behavior: smooth; }
+    .prose pre { white-space: pre-wrap; }
+    /* iOS momentum scroll in modals/lists */
+    .touch-scroll { -webkit-overflow-scrolling: touch; }
+  </style>
+</head>
+
+<body class="bg-white text-gray-900 dark:bg-gray-900 dark:text-gray-100">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useMemo, useRef } = React;
+
+    // ---- Helpers ----
+    const clsx = (...a) => a.filter(Boolean).join(' ');
+    const normalizeEntry = e => ({
+      id: 0, category: 'General', objection: '',
+      acknowledge: '', differentiate: '', anchor: '', close: '',
+      opening: '', discovery: '', transition: '', closingScript: '',
+      script: '', notes: '', ...e
+    });
+
+    const CATEGORY_BADGES = {
+      'Price & Money': 'bg-rose-100 text-rose-800 border-rose-200 dark:bg-rose-900/30 dark:text-rose-200 dark:border-rose-800',
+      'Value / Belief': 'bg-sky-100 text-sky-800 border-sky-200 dark:bg-sky-900/30 dark:text-sky-200 dark:border-sky-800',
+      'Timing': 'bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-200 dark:border-amber-800',
+      'Trust / Proof': 'bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-200 dark:border-emerald-800',
+      'Competition / Alternatives': 'bg-violet-100 text-violet-800 border-violet-200 dark:bg-violet-900/30 dark:text-violet-200 dark:border-violet-800',
+      'Decision-Making': 'bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-900/30 dark:text-orange-200 dark:border-orange-800',
+      'Pricing / Strategy': 'bg-indigo-100 text-indigo-800 border-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-200 dark:border-indigo-800',
+      'General': 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-800 dark:text-gray-200 dark:border-gray-700'
+    };
+
+    const IconSun = (props) => (
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" {...props}>
+        <circle cx="12" cy="12" r="4"></circle>
+        <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"></path>
+      </svg>
+    );
+    const IconMoon = (props) => (
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" {...props}>
+        <path d="M21 12.79A9 9 0 1 1 11.21 3a7 7 0 1 0 9.79 9.79z"></path>
+      </svg>
+    );
+
+    function TextArea({ label, value, onChange, rows = 6, placeholder='' }) {
+      return (
+        <div className="space-y-1">
+          {label ? <label className="text-sm text-gray-600 dark:text-gray-300">{label}</label> : null}
+          <textarea
+            rows={rows}
+            value={value ?? ''}
+            onChange={e => onChange(e.target.value)}
+            placeholder={placeholder}
+            className="w-full rounded-xl border px-3 py-2 bg-white dark:bg-gray-900 dark:text-gray-100 dark:border-gray-700"
+          />
+        </div>
+      );
+    }
+
+    function CopyButton({ text, className = '' }) {
+      const [copied, setCopied] = useState(false);
+      return (
+        <button
+          onClick={() => { navigator.clipboard.writeText(text || ''); setCopied(true); setTimeout(() => setCopied(false), 1200); }}
+          className={clsx('px-3 py-2 rounded-xl border dark:border-gray-700 text-sm', className)}
+        >
+          {copied ? 'Copied' : 'Copy'}
+        </button>
+      );
+    }
+
+    function HowItWorks({ open, onClose }) {
+      if (!open) return null;
+      return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50" onClick={onClose}></div>
+
+          <div className="relative w-full max-w-2xl rounded-2xl border dark:border-gray-700 bg-white dark:bg-gray-800 max-h-[85vh] overflow-y-auto touch-scroll">
+            <div className="p-5 md:p-6">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-xl font-bold">How this demo works</h2>
+                <button onClick={onClose} className="px-3 py-1.5 rounded-xl border dark:border-gray-700">Close</button>
+              </div>
+
+              <div className="space-y-4 text-sm leading-relaxed">
+                <div>
+                  <h3 className="font-semibold">What it is</h3>
+                  <p className="mt-1">A safe preview of Objection Navigator. It uses sample objections from a small file, not your private set.</p>
+                </div>
+
+                <div>
+                  <h3 className="font-semibold">What you can do</h3>
+                  <ul className="list-disc ml-5 space-y-2 mt-1">
+                    <li>Browse objections, then view the ADA plus C response.</li>
+                    <li>Search by keywords, filter by category.</li>
+                    <li>Quick edit in the demo to test your talk tracks.</li>
+                    <li>Copy a full script with one click.</li>
+                  </ul>
+                </div>
+
+                <div>
+                  <h3 className="font-semibold">What the full app adds</h3>
+                  <ul className="list-disc ml-5 space-y-2 mt-1">
+                    <li>Your private objection library in the cloud.</li>
+                    <li>Categories you control, import and export, and autosave.</li>
+                    <li>Simple sign in with Google.</li>
+                  </ul>
+                </div>
+
+                <div className="rounded-xl border dark:border-gray-700 p-3">
+                  <h3 className="font-semibold">Ready for your own account</h3>
+                  <p className="mt-1">Click “Get account” on the top right. You will sign in on the main app and your workspace will be saved there.</p>
+                </div>
+              </div>
+
+              <div className="flex justify-end mt-5">
+                <button onClick={onClose} className="px-3 py-1.5 rounded-xl border bg-black text-white">Got it</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function DemoBanner() {
+      return (
+        <div className="rounded-xl border dark:border-gray-700 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-900 dark:text-emerald-100 px-3 py-2 text-sm">
+          Demo mode, sample objections only. Use “Get account” to set up your own private library.
+        </div>
+      );
+    }
+
+    // ---- App ----
+    function App() {
+      const [isDark, setIsDark] = useState(() => document.documentElement.classList.contains('dark'));
+      const [showHelp, setShowHelp] = useState(false);
+
+      function toggleTheme() {
+        const next = !isDark;
+        setIsDark(next);
+        document.documentElement.classList.toggle('dark', next);
+        localStorage.setItem('theme', next ? 'dark' : 'light');
+      }
+
+      const detailRef = useRef(null);
+
+      // Load demo entries from JSON
+      const DEMO_URL = "/demo/starter_data.json?v=1";
+      const [entries, setEntries] = useState([]);
+      const [loadedFrom, setLoadedFrom] = useState('');
+
+      useEffect(() => {
+        let cancelled = false;
+        (async () => {
+          try {
+            const res = await fetch(DEMO_URL, { cache: 'no-store' });
+            if (!res.ok) throw new Error('not ok');
+            const arr = await res.json();
+            const norm = Array.isArray(arr) ? arr.map(normalizeEntry) : [];
+            if (!norm.length) throw new Error('empty');
+            if (!cancelled) { setEntries(norm); setLoadedFrom('json'); }
+          } catch (e) {
+            if (!cancelled) {
+              // tiny safe fallback
+              const fallback = [
+                { id: 1, category: 'Timing', objection: '“The market is cooling — I want to wait.”', acknowledge: 'I hear that. Timing matters.', differentiate: 'This isn’t about selling in a frenzy. It’s about selling with strategy while others wait.', anchor: 'Waiting could mean missing today’s motivated buyers and losing equity as prices shift.', close: 'Do you want to ride the current wave, or wait and hope it rebounds?' },
+                { id: 2, category: 'Competition / Alternatives', objection: '“I can sell it myself and save the commission.”', acknowledge: 'Totally get it. Saving money sounds smart.', differentiate: "But this isn't about listing a home, it's about getting top-dollar with negotiation power.", anchor: 'FSBO homes often sell for less and take longer. That savings could cost you more.', close: 'Do you want to save on commission, or make the most on your sale?' }
+              ].map(normalizeEntry);
+              setEntries(fallback);
+              setLoadedFrom('fallback');
+            }
+          }
+        })();
+        return () => { cancelled = true; };
+      }, []);
+
+      // UI state
+      const [q, setQ] = useState('');
+      const [categoryFilter, setCategoryFilter] = useState('All');
+      const [activeIdx, setActiveIdx] = useState(0);
+      const [tab, setTab] = useState('ada');
+      const [quickEdit, setQuickEdit] = useState(false);
+      const [quickDraft, setQuickDraft] = useState(null);
+
+      const categories = useMemo(() => {
+        const set = new Set(['All']);
+        entries.forEach(d => d.category && set.add(d.category));
+        return Array.from(set);
+      }, [entries]);
+
+      const filtered = useMemo(() => {
+        const words = q.toLowerCase().split(/\s+/).filter(Boolean);
+        return entries.filter(d => {
+          const inCat = categoryFilter === 'All' || d.category === categoryFilter;
+          const hay = `${d.objection} ${d.acknowledge} ${d.differentiate} ${d.anchor} ${d.close} ${d.script||''} ${d.notes||''}`.toLowerCase();
+          return inCat && words.every(w => hay.includes(w));
+        });
+      }, [q, categoryFilter, entries]);
+
+      const active = filtered[activeIdx] || filtered[0];
+
+      useEffect(() => { if (active) setQuickDraft(normalizeEntry(active)); }, [activeIdx, filtered.length, active?.id, tab]);
+      useEffect(() => { setActiveIdx(0); }, [q, categoryFilter]);
+
+      function selectRow(idx) {
+        setActiveIdx(idx);
+        // On small screens, scroll to the detail card
+        setTimeout(() => {
+          detailRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 0);
+      }
+
+      function badgeClass(cat) {
+        return CATEGORY_BADGES[cat] || CATEGORY_BADGES['General'];
+      }
+
+      function qeField(k, v) { setQuickDraft(prev => ({ ...prev, [k]: v })); }
+      function qeSave() {
+        if (!quickDraft) return;
+        setQuickEdit(false);
+        setEntries(prev => prev.map(d => d.id === quickDraft.id ? { ...normalizeEntry(quickDraft) } : d));
+      }
+      function qeCancel() { setQuickDraft(normalizeEntry(active)); setQuickEdit(false); }
+
+      return (
+        <div className="min-h-screen w-full p-4 md:p-8">
+          <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
+            {/* Left column */}
+            <div className="md:col-span-1 space-y-3">
+              <header className="flex items-start md:items-center justify-between gap-3">
+                <div>
+                  <h1 className="text-xl md:text-2xl font-bold leading-tight">
+                    <span className="inline-flex items-center gap-2">
+                      <img
+                        src="https://objectionsiq.com/wp-content/uploads/2025/08/cropped-objectionsiq-favicon.png"
+                        alt="ObjectionIQ logo"
+                        className="h-7 w-7 md:h-8 md:w-8 shrink-0 rounded"
+                        loading="lazy"
+                        decoding="async"
+                      />
+                      <span>Objection<span className="text-[#059669]">IQ</span> Navigator, Demo</span>
+                    </span>
+                    <span className="block text-xs md:text-sm text-gray-500 mt-1">By Digital Footprint</span>
+                  </h1>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                  <button
+                    onClick={() => setShowHelp(true)}
+                    className="px-3 py-2 rounded-xl border dark:border-gray-700 text-sm"
+                  >
+                    How it works
+                  </button>
+                  <a
+                    href="/"
+                    className="px-3 py-2 rounded-xl border bg-black text-white text-sm"
+                    title="Go to the main app to create your account"
+                  >
+                    Get account
+                  </a>
+                  <button
+                    onClick={() => {
+                      const next = !document.documentElement.classList.contains('dark');
+                      document.documentElement.classList.toggle('dark', next);
+                      localStorage.setItem('theme', next ? 'dark' : 'light');
+                      setIsDark(next);
+                    }}
+                    className="px-2 py-2 rounded-xl border dark:border-gray-700"
+                    aria-label="Toggle dark mode"
+                    title="Toggle theme"
+                  >
+                    {isDark ? <IconSun /> : <IconMoon />}
+                  </button>
+                </div>
+              </header>
+
+              <DemoBanner />
+              <div className="text-xs text-gray-500 dark:text-gray-400">Loaded from, {loadedFrom || 'loading'}</div>
+
+              <div className="flex items-center gap-2 mt-2">
+                <input
+                  value={q}
+                  onChange={e => setQ(e.target.value)}
+                  placeholder="Search objections"
+                  className="w-full rounded-2xl border border-gray-300 dark:border-gray-700 px-4 py-2 bg-white dark:bg-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-400 dark:focus:ring-gray-600"
+                />
+              </div>
+
+              <div className="flex flex-wrap gap-2 mt-2">
+                {categories.map(cat => (
+                  <button
+                    key={cat}
+                    onClick={() => setCategoryFilter(cat)}
+                    className={clsx(
+                      'px-3 py-1.5 rounded-full border text-sm dark:border-gray-700',
+                      cat !== 'All' && badgeClass(cat),
+                      categoryFilter === cat && 'ring-2 ring-black/10 dark:ring-white/10'
+                    )}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
+
+              <div className="bg-gray-50 dark:bg-gray-900 rounded-2xl border dark:border-gray-700 overflow-hidden">
+                <div className="max-h-[60vh] md:max-h-[70vh] overflow-auto touch-scroll divide-y dark:divide-gray-800">
+                  {filtered.map((item, idx) => {
+                    const isActive = idx === activeIdx;
+                    return (
+                      <div
+                        key={item.id}
+                        className={clsx(
+                          'p-3 space-y-2 border-b dark:border-gray-800',
+                          isActive ? 'bg-[#d1fae5] dark:bg-emerald-900/40' : 'hover:bg-gray-50 dark:hover:bg-gray-800'
+                        )}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <button
+                            onClick={() => selectRow(idx)}
+                            className="text-left flex-1"
+                            aria-label={`Select objection ${item.id}`}
+                          >
+                            <div className="font-medium">{item.id}. {item.objection}</div>
+                          </button>
+                          <div className={clsx('px-2 py-0.5 rounded-full border text-xs', badgeClass(item.category))}>
+                            {item.category}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {!filtered.length && (
+                    <div className="p-4 text-sm text-gray-500">No results</div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Right column */}
+            <div className="md:col-span-2">
+              {active ? (
+                <div
+                  ref={detailRef}
+                  id={`resp-${active.id}`}
+                  className="bg-white dark:bg-gray-800 dark:border-gray-700 rounded-3xl border p-5 md:p-8 shadow-sm"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className={clsx('inline-flex items-center gap-2 px-2.5 py-1 rounded-full border text-xs', badgeClass(active.category))}>
+                        {active.category}
+                      </div>
+                      <h2 className="text-2xl font-bold mt-3">{active.id}. {active.objection}</h2>
+                    </div>
+                    <div className="flex flex-wrap gap-2 sm:gap-3 items-center">
+                      <button
+                        onClick={() => setQuickEdit(q => !q)}
+                        className={clsx('px-3 py-2 rounded-xl border dark:border-gray-700 text-sm', quickEdit && 'bg-black text-white')}
+                      >
+                        {quickEdit ? 'Done' : 'Quick edit'}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 flex gap-2 sm:gap-3">
+                    <button
+                      className={clsx('px-3 py-2 rounded-xl border dark:border-gray-700 text-sm', tab==='ada' && 'bg-black text-white')}
+                      onClick={() => setTab('ada')}
+                    >
+                      ADA+C
+                    </button>
+                    <button
+                      className={clsx('px-3 py-2 rounded-xl border dark:border-gray-700 text-sm', tab==='scripts' && 'bg-black text-white')}
+                      onClick={() => setTab('scripts')}
+                    >
+                      Scripts and notes
+                    </button>
+                  </div>
+
+                  {tab === 'ada' ? (
+                    <div className="mt-6 space-y-6 prose">
+                      <section>
+                        <h3 className="font-semibold mb-2">Acknowledge</h3>
+                        {quickEdit ? (
+                          <TextArea value={quickDraft?.acknowledge} onChange={val => qeField('acknowledge', val)} />
+                        ) : (
+                          <p className="leading-relaxed whitespace-pre-line">{active.acknowledge}</p>
+                        )}
+                      </section>
+                      <section>
+                        <h3 className="font-semibold mb-2">Differentiate</h3>
+                        {quickEdit ? (
+                          <TextArea value={quickDraft?.differentiate} onChange={val => qeField('differentiate', val)} />
+                        ) : (
+                          <p className="leading-relaxed whitespace-pre-line">{active.differentiate}</p>
+                        )}
+                      </section>
+                      <section>
+                        <h3 className="font-semibold mb-2">Anchor</h3>
+                        {quickEdit ? (
+                          <TextArea value={quickDraft?.anchor} onChange={val => qeField('anchor', val)} />
+                        ) : (
+                          <p className="leading-relaxed whitespace-pre-line">{active.anchor}</p>
+                        )}
+                      </section>
+                      <section>
+                        <h3 className="font-semibold mb-2">Close</h3>
+                        {quickEdit ? (
+                          <TextArea value={quickDraft?.close} onChange={val => qeField('close', val)} />
+                        ) : (
+                          <p className="italic leading-relaxed">{active.close}</p>
+                        )}
+                      </section>
+                      <section className="pt-2">
+                        <div className="flex items-center justify-between">
+                          <h3 className="font-semibold mb-2">Composed script</h3>
+                          <CopyButton text={`${(quickEdit ? quickDraft?.acknowledge : active.acknowledge)||''}\n\n${(quickEdit ? quickDraft?.differentiate : active.differentiate)||''}\n\n${(quickEdit ? quickDraft?.anchor : active.anchor)||''}\n\n${(quickEdit ? quickDraft?.close : active.close)||''}`} />
+                        </div>
+                        {quickEdit ? (
+                          <TextArea value={quickDraft?.script} onChange={val => qeField('script', val)} rows={10} placeholder="Write your talk track here" />
+                        ) : (
+                          <pre className="bg-gray-50 dark:bg-gray-900 rounded-xl p-4">{`${active.acknowledge}\n\n${active.differentiate}\n\n${active.anchor}\n\n${active.close}`}</pre>
+                        )}
+                      </section>
+
+                      {quickEdit && (
+                        <div className="flex flex-wrap gap-2 sm:gap-3 pt-2">
+                          <button onClick={qeSave} className="px-3 py-2 rounded-xl border bg-black text-white text-sm">Save changes</button>
+                          <button onClick={qeCancel} className="px-3 py-2 rounded-xl border dark:border-gray-700 text-sm">Cancel</button>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="mt-6 space-y-6 prose">
+                      <section>
+                        <h3 className="font-semibold mb-2">Opening script</h3>
+                        {quickEdit ? (
+                          <TextArea value={quickDraft?.opening} onChange={val => qeField('opening', val)} rows={6} />
+                        ) : (
+                          <pre className="bg-gray-50 dark:bg-gray-900 rounded-xl p-4">{active.opening || '—'}</pre>
+                        )}
+                      </section>
+                      <section>
+                        <h3 className="font-semibold mb-2">Discovery questions</h3>
+                        {quickEdit ? (
+                          <TextArea value={quickDraft?.discovery} onChange={val => qeField('discovery', val)} rows={6} />
+                        ) : (
+                          <pre className="bg-gray-50 dark:bg-gray-900 rounded-xl p-4">{active.discovery || '—'}</pre>
+                        )}
+                      </section>
+                      <section>
+                        <h3 className="font-semibold mb-2">Transition bridge</h3>
+                        {quickEdit ? (
+                          <TextArea value={quickDraft?.transition} onChange={val => qeField('transition', val)} rows={5} />
+                        ) : (
+                          <pre className="bg-gray-50 dark:bg-gray-900 rounded-xl p-4">{active.transition || '—'}</pre>
+                        )}
+                      </section>
+                      <section>
+                        <h3 className="font-semibold mb-2">Closing script</h3>
+                        {quickEdit ? (
+                          <TextArea value={quickDraft?.closingScript} onChange={val => qeField('closingScript', val)} rows={5} />
+                        ) : (
+                          <pre className="bg-gray-50 dark:bg-gray-900 rounded-xl p-4">{active.closingScript || '—'}</pre>
+                        )}
+                      </section>
+                      <section>
+                        <div className="flex items-center justify-between">
+                          <h3 className="font-semibold mb-2">Internal notes</h3>
+                          <CopyButton text={quickEdit ? (quickDraft?.notes||'') : (active.notes || '')} />
+                        </div>
+                        {quickEdit ? (
+                          <TextArea value={quickDraft?.notes} onChange={val => qeField('notes', val)} rows={6} />
+                        ) : (
+                          <pre className="bg-gray-50 dark:bg-gray-900 rounded-xl p-4">{active.notes || '—'}</pre>
+                        )}
+                      </section>
+
+                      {quickEdit && (
+                        <div className="flex flex-wrap gap-2 sm:gap-3 pt-2">
+                          <button onClick={qeSave} className="px-3 py-2 rounded-xl border bg-black text-white text-sm">Save changes</button>
+                          <button onClick={qeCancel} className="px-3 py-2 rounded-xl border dark:border-gray-700 text-sm">Cancel</button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="bg-white dark:bg-gray-800 rounded-3xl border dark:border-gray-700 p-6 text-sm text-gray-500">
+                  Loading demo entries
+                </div>
+              )}
+            </div>
+          </div>
+
+          <footer className="max-w-7xl mx-auto mt-6 text-xs text-gray-500 dark:text-gray-400">
+            Demo, sample objections, search, quick edit. Click “Get account” to use your own private set.
+          </footer>
+
+          <HowItWorks open={showHelp} onClose={() => setShowHelp(false)} />
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
